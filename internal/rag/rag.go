@@ -228,28 +228,28 @@ func firstNonEmpty(s ...string) string {
 // NothingFound is what the extract prompt answers for a part without a match.
 const NothingFound = "(nichts gefunden)"
 
-// Extract applies instruction to each part of a document with the answer
-// model and returns one result per part. Parts are processed in order; a
-// cancelled ctx stops after the current part.
-func (e *Engine) Extract(ctx context.Context, instruction, document string, parts []string) ([]string, error) {
+// ModelName identifies the answer model, e.g. for cache keys; "" without one.
+func (e *Engine) ModelName() string {
 	if e.llm == nil {
-		return nil, errors.New("kein Antwortmodell eingerichtet")
+		return ""
 	}
-	out := make([]string, 0, len(parts))
-	for i, p := range parts {
-		if err := ctx.Err(); err != nil {
-			return out, err
-		}
-		resp, err := e.extract.Execute(ctx, askyourdocs.PromptOptions(e.llm, e.llmConfig, map[string]any{
-			"instruction": askyourdocs.SanitizeUntrusted(instruction),
-			"document":    askyourdocs.SanitizeUntrusted(document),
-			"part":        fmt.Sprintf("Teil %d von %d", i+1, len(parts)),
-			"text":        askyourdocs.WrapUntrusted("document", p),
-		})...)
-		if err != nil {
-			return out, fmt.Errorf("Teil %d: %w", i+1, err)
-		}
-		out = append(out, strings.TrimSpace(resp.Text()))
+	return e.llm.Name()
+}
+
+// ExtractPart applies instruction to one part of a document with the answer
+// model. part labels it for the model, e.g. "Seiten 1-2, Teil 1 von 3".
+func (e *Engine) ExtractPart(ctx context.Context, instruction, document, part, text string) (string, error) {
+	if e.llm == nil {
+		return "", errors.New("kein Antwortmodell eingerichtet")
 	}
-	return out, nil
+	resp, err := e.extract.Execute(ctx, askyourdocs.PromptOptions(e.llm, e.llmConfig, map[string]any{
+		"instruction": askyourdocs.SanitizeUntrusted(instruction),
+		"document":    askyourdocs.SanitizeUntrusted(document),
+		"part":        part,
+		"text":        askyourdocs.WrapUntrusted("document", text),
+	})...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(resp.Text()), nil
 }

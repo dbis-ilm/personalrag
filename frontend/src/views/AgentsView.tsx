@@ -94,7 +94,7 @@ export default function AgentsView({ collections, onChanged }: {
           <h2 id="h-log">Zugriffsprotokoll</h2>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Zeit</th><th>Client</th><th>Werkzeug</th><th>Anfrage</th><th>Ergebnis</th></tr></thead>
+              <thead><tr><th>Zeit</th><th>Client</th><th>Werkzeug</th><th>Anfrage</th><th>Ergebnis</th><th style={{ textAlign: 'right' }}>Dauer</th></tr></thead>
               <tbody>
                 {log.map((l, i) => (
                   <tr key={i}>
@@ -102,10 +102,11 @@ export default function AgentsView({ collections, onChanged }: {
                     <td style={{ whiteSpace: 'nowrap' }}>{l.client}</td>
                     <td><code className="inline-code">{l.tool}</code></td>
                     <td style={{ color: 'var(--text-2)' }}>{l.query}</td>
-                    <td className={`text-${l.kind}`} style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{l.result}</td>
+                    <td className={`text-${l.kind}`} style={{ fontWeight: 600 }}>{l.result}</td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-2)' }}>{l.duration}</td>
                   </tr>
                 ))}
-                {log.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 24 }}>Noch keine Zugriffe.</td></tr>}
+                {log.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 24 }}>Noch keine Zugriffe.</td></tr>}
               </tbody>
             </table>
           </div>

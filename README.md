@@ -94,11 +94,11 @@ Claude Code: `claude mcp add personalrag -- /Applications/PersonalRAG.app/Conten
 | --- | --- |
 | `list_collections` | Shared collections and their document counts |
 | `list_documents` | Every document of the shared collections, filterable by collection, folder, format and date, paged. Includes documents that could not be read (e.g. scans needing OCR), so an evaluation can report what it did not cover |
-| `read_document` | Full text of one document, paged by characters, with `[Seite n]` page markers |
+| `read_document` | Full text of one document, paged by characters, with `[Seite n]` page markers; optionally only some pages (`pages: "1-2"`) |
 | `search_documents` | Hybrid search; returns the most relevant passages, not all matches |
-| `extract` | Applies an instruction to one whole document with *your* model (e.g. "list the names under Anwesend") and returns only the result |
+| `extract` | Applies an instruction to a document with *your* model (e.g. "list the names under Anwesend") and returns only the result. `pages` limits it to where the information is, `stop_after_match` ends at the first part with a match. Results are cached per document version, model and instruction |
 
-Search answers questions; it does not cover every document. For evaluations over a whole collection, such as listing all participants of all meetings and counting how often each attended, let the agent call `list_documents`, then `extract` (or `read_document`) for each document, and count with code. The server tells the client this in its instructions. With `extract`, the document text stays with your model and only the result reaches the agent; with `read_document`, the agent's model sees the text. If the agent runs on a cloud model, that text goes to its provider.
+Search answers questions; it does not cover every document. For evaluations over a whole collection, such as listing all participants of all meetings and counting how often each attended, let the agent call `list_documents`, then `extract` (or `read_document`) for each document, and count with code. The server tells the client this in its instructions. `extract` is the slow part, since your model reads the whole document: say in the prompt where the information is (e.g. "on the first page"), so the agent passes `pages`. On real meeting minutes this cut a call from about 43 s to 8 s; a repeated call returns from the cache at once. Each call's duration is shown in the access log. With `extract`, the document text stays with your model and only the result reaches the agent; with `read_document`, the agent's model sees the text. If the agent runs on a cloud model, that text goes to its provider.
 
 ## How it works
 

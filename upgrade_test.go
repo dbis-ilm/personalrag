@@ -31,7 +31,7 @@ func TestUpgradeFromPrototype(t *testing.T) {
 		t.Fatalf("open legacy history: %v", err)
 	}
 
-	for comp, want := range map[string]int{"index": 2, "history": 1} {
+	for comp, want := range map[string]int{"index": 3, "history": 1} {
 		if v, _ := migrate.Version(ctx, st.DB(), comp); v != want {
 			t.Errorf("%s version = %d, want %d", comp, v, want)
 		}

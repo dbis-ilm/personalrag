@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -41,7 +42,7 @@ func TestDiagnostics(t *testing.T) {
 		t.Errorf("previous crash not in status: %+v", st)
 	}
 	d := s.Diagnostics()
-	for _, want := range []string{"PersonalRAG " + version, "System: ", "Schema: index v2, history v1", "Index: 0 Sammlungen", "--- Absturz am", "panic: runtime error", "marker-for-tail", "~/Dokumente/a.pdf"} {
+	for _, want := range []string{"PersonalRAG " + version, "System: ", "Schema: index v3, history v1", "Index: 0 Sammlungen", "--- Absturz am", "panic: runtime error", "marker-for-tail", "~/Dokumente/a.pdf"} {
 		if !strings.Contains(d, want) {
 			t.Errorf("diagnostics lack %q", want)
 		}
@@ -60,4 +61,12 @@ func TestDiagnostics(t *testing.T) {
 		t.Errorf("level not persisted: %+v", cfg)
 	}
 	s.SetLogLevel("info")
+}
+
+func TestFormatDuration(t *testing.T) {
+	for d, want := range map[time.Duration]string{0: "", 420 * time.Millisecond: "0,4 s", 12 * time.Second: "12 s", 125 * time.Second: "2:05 min"} {
+		if got := formatDuration(d); got != want {
+			t.Errorf("formatDuration(%v) = %q, want %q", d, got, want)
+		}
+	}
 }

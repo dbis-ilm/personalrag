@@ -194,12 +194,13 @@ type ClientConfig struct {
 }
 
 type AccessLogEntry struct {
-	Time   string `json:"time"`
-	Client string `json:"client"`
-	Tool   string `json:"tool"`
-	Query  string `json:"query"`
-	Result string `json:"result"`
-	Kind   string `json:"kind"`
+	Time     string `json:"time"`
+	Client   string `json:"client"`
+	Tool     string `json:"tool"`
+	Query    string `json:"query"`
+	Result   string `json:"result"`
+	Kind     string `json:"kind"`
+	Duration string `json:"duration"`
 }
 
 // ---- Service ----
@@ -995,6 +996,20 @@ func firstNonEmpty(v ...string) string {
 	return ""
 }
 
+// formatDuration labels a call duration: "0,4 s", "12 s", "2:05 min".
+func formatDuration(d time.Duration) string {
+	switch {
+	case d <= 0:
+		return ""
+	case d < 10*time.Second:
+		return strings.Replace(fmt.Sprintf("%.1f s", d.Seconds()), ".", ",", 1)
+	case d < time.Minute:
+		return fmt.Sprintf("%d s", int(d.Round(time.Second).Seconds()))
+	}
+	s := int(d.Round(time.Second).Seconds())
+	return fmt.Sprintf("%d:%02d min", s/60, s%60)
+}
+
 // relTime labels a timestamp for the history list.
 func relTime(t time.Time) string {
 	now := time.Now()
@@ -1245,7 +1260,7 @@ func (s *AppService) AccessLog() []AccessLogEntry {
 		return out
 	}
 	for _, e := range entries {
-		out = append(out, AccessLogEntry{Time: relTime(e.At), Client: firstNonEmpty(e.Client, "unbekannt"), Tool: e.Tool, Query: e.Request, Result: e.Result, Kind: e.Kind})
+		out = append(out, AccessLogEntry{Time: relTime(e.At), Client: firstNonEmpty(e.Client, "unbekannt"), Tool: e.Tool, Query: e.Request, Result: e.Result, Kind: e.Kind, Duration: formatDuration(e.Duration)})
 	}
 	return out
 }

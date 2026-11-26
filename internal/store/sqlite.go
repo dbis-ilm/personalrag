@@ -164,6 +164,26 @@ var indexSteps = []migrate.Step{
 			kind TEXT NOT NULL DEFAULT 'ok')`,
 		`CREATE INDEX IF NOT EXISTS agent_log_at ON agent_log(at DESC)`,
 	)},
+	{Version: 3, Name: "extract cache, call duration", Up: func(ctx context.Context, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS extract_cache (
+			key TEXT PRIMARY KEY, document_id INTEGER NOT NULL, result TEXT NOT NULL, created_at INTEGER NOT NULL)`); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS extract_cache_document ON extract_cache(document_id)`); err != nil {
+			return err
+		}
+		// The app and an MCP process may migrate at the same time; add the
+		// column only if the other one has not.
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM pragma_table_info('agent_log') WHERE name = 'duration_ms'`).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			_, err := tx.ExecContext(ctx, `ALTER TABLE agent_log ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0`)
+			return err
+		}
+		return nil
+	}},
 }
 
 func (s *Store) migrate(path string) error {
@@ -314,6 +334,9 @@ func (s *Store) DeleteChunks(ctx context.Context, documentID int64) (int, error)
 		return 0, err
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM extract_cache WHERE document_id = ?`, documentID); err != nil {
+		return 0, err
+	}
 	sub := `(SELECT id FROM chunks WHERE document_id = ?)`
 	if _, err := tx.ExecContext(ctx, `DELETE FROM chunks_fts WHERE rowid IN `+sub, documentID); err != nil {
 		return 0, err
@@ -711,12 +734,13 @@ func toInt64(v any) (int64, bool) {
 
 // AccessEntry is one tool call by an agent (MCP client).
 type AccessEntry struct {
-	At      time.Time
-	Client  string
-	Tool    string
-	Request string
-	Result  string
-	Kind    string // ok | warn | denied | error
+	At       time.Time
+	Client   string
+	Tool     string
+	Request  string
+	Result   string
+	Kind     string // ok | warn | denied | error
+	Duration time.Duration
 }
 
 // maxAccessLog caps the log; older entries are dropped.
@@ -727,8 +751,8 @@ func (s *Store) LogAccess(ctx context.Context, e AccessEntry) error {
 	if e.At.IsZero() {
 		e.At = time.Now()
 	}
-	if _, err := s.db.ExecContext(ctx, `INSERT INTO agent_log(at, client, tool, request, result, kind) VALUES (?, ?, ?, ?, ?, ?)`,
-		e.At.UnixMilli(), e.Client, e.Tool, e.Request, e.Result, e.Kind); err != nil {
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO agent_log(at, client, tool, request, result, kind, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		e.At.UnixMilli(), e.Client, e.Tool, e.Request, e.Result, e.Kind, e.Duration.Milliseconds()); err != nil {
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `DELETE FROM agent_log WHERE id <= (SELECT max(id) FROM agent_log) - ?`, maxAccessLog)
@@ -737,7 +761,7 @@ func (s *Store) LogAccess(ctx context.Context, e AccessEntry) error {
 
 // AccessLog returns the newest entries first.
 func (s *Store) AccessLog(ctx context.Context, limit int) ([]AccessEntry, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT at, client, tool, request, result, kind FROM agent_log ORDER BY id DESC LIMIT ?`, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT at, client, tool, request, result, kind, duration_ms FROM agent_log ORDER BY id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -745,12 +769,38 @@ func (s *Store) AccessLog(ctx context.Context, limit int) ([]AccessEntry, error)
 	var out []AccessEntry
 	for rows.Next() {
 		var e AccessEntry
-		var at int64
-		if err := rows.Scan(&at, &e.Client, &e.Tool, &e.Request, &e.Result, &e.Kind); err != nil {
+		var at, ms int64
+		if err := rows.Scan(&at, &e.Client, &e.Tool, &e.Request, &e.Result, &e.Kind, &ms); err != nil {
 			return nil, err
 		}
-		e.At = time.UnixMilli(at)
+		e.At, e.Duration = time.UnixMilli(at), time.Duration(ms)*time.Millisecond
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// ---- Extract cache ----
+
+// maxExtractCache caps cached extract results; older ones are dropped.
+const maxExtractCache = 20000
+
+// CachedExtract returns a stored extract result.
+func (s *Store) CachedExtract(ctx context.Context, key string) (string, bool, error) {
+	var r string
+	err := s.db.QueryRowContext(ctx, `SELECT result FROM extract_cache WHERE key = ?`, key).Scan(&r)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	return r, err == nil, err
+}
+
+// PutExtract stores an extract result for one document part. Results go
+// when the document is re-indexed or removed.
+func (s *Store) PutExtract(ctx context.Context, key string, documentID int64, result string) error {
+	if _, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO extract_cache(key, document_id, result, created_at) VALUES (?, ?, ?, ?)`,
+		key, documentID, result, time.Now().Unix()); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM extract_cache WHERE rowid <= (SELECT max(rowid) FROM extract_cache) - ?`, maxExtractCache)
+	return err
 }
