@@ -14,3 +14,6 @@ frontend/bindings
 *.db-wal
 .DS_Store
 Thumbs.db
+
+# Test fixtures are databases on purpose
+!testdata/*.db

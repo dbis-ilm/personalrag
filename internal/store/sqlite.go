@@ -25,10 +25,9 @@ import (
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
+	"personalrag/internal/migrate"
 	"personalrag/internal/paths"
 )
-
-const schemaVersion = "1"
 
 // Metadata keys a chunk document carries into Index.
 const (
@@ -116,7 +115,7 @@ func Open(path string, emb ai.Embedder, model string, dim int) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{db: db, emb: emb, model: model, dim: dim}
-	if err := s.migrate(); err != nil {
+	if err := s.migrate(path); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -130,8 +129,11 @@ func (s *Store) DB() *sql.DB { return s.db }
 
 func (s *Store) Close() error { return s.db.Close() }
 
-func (s *Store) migrate() error {
-	stmts := []string{
+// indexSteps are the index schema's migrations. Step 1 is idempotent so it
+// adopts databases created before versioning; later steps must not be
+// edited once released, only appended.
+var indexSteps = []migrate.Step{
+	{Version: 1, Name: "baseline", Up: migrate.Exec(
 		`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS collections (
 			id TEXT PRIMARY KEY, name TEXT NOT NULL, color TEXT NOT NULL,
@@ -153,14 +155,12 @@ func (s *Store) migrate() error {
 			section TEXT NOT NULL DEFAULT '', breadcrumb TEXT NOT NULL DEFAULT '')`,
 		`CREATE INDEX IF NOT EXISTS chunks_document ON chunks(document_id)`,
 		`CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(text, section, tokenize = 'unicode61 remove_diacritics 2')`,
-	}
-	for _, q := range stmts {
-		if _, err := s.db.Exec(q); err != nil {
-			return fmt.Errorf("migrate: %w", err)
-		}
-	}
-	_, err := s.db.Exec(`INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)`, schemaVersion)
-	return err
+		`DELETE FROM meta WHERE key = 'schema_version'`,
+	)},
+}
+
+func (s *Store) migrate(path string) error {
+	return migrate.Apply(context.Background(), s.db, "index", indexSteps, migrate.Options{BackupPath: path + ".bak"})
 }
 
 // checkEmbedding creates the vector table on first use and verifies the

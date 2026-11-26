@@ -364,7 +364,7 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 	if c.eng, err = rag.New(g, c.st, llm, llmCfg); err != nil {
 		return fail(err)
 	}
-	if c.hist, err = history.New(c.st.DB()); err != nil {
+	if c.hist, err = history.New(c.st.DB(), filepath.Join(s.dataDir, "index.db.history.bak")); err != nil {
 		return fail(err)
 	}
 	if err := c.hist.MarkInterrupted(ctx); err != nil {

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"personalrag/internal/migrate"
 )
 
 // ErrNotFound is returned for unknown conversations or turns.
@@ -42,9 +44,9 @@ type Turn struct {
 
 type Store struct{ db *sql.DB }
 
-// New creates the tables in db (the index database) if needed.
-func New(db *sql.DB) (*Store, error) {
-	stmts := []string{
+// historySteps are the conversation schema's migrations; append only.
+var historySteps = []migrate.Step{
+	{Version: 1, Name: "baseline", Up: migrate.Exec(
 		`CREATE TABLE IF NOT EXISTS conversations (
 			id TEXT PRIMARY KEY, title TEXT NOT NULL, collection_id TEXT NOT NULL DEFAULT '',
 			created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
@@ -57,11 +59,15 @@ func New(db *sql.DB) (*Store, error) {
 			confidence TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '',
 			done INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)`,
 		`CREATE INDEX IF NOT EXISTS turns_conversation ON turns(conversation_id, id)`,
-	}
-	for _, q := range stmts {
-		if _, err := db.Exec(q); err != nil {
-			return nil, fmt.Errorf("history: %w", err)
-		}
+	)},
+}
+
+// New migrates the conversation tables in db (the index database). Pass the
+// database file's path as backupPath's base to keep a copy before a real
+// migration; empty skips the backup.
+func New(db *sql.DB, backupPath string) (*Store, error) {
+	if err := migrate.Apply(context.Background(), db, "history", historySteps, migrate.Options{BackupPath: backupPath}); err != nil {
+		return nil, fmt.Errorf("history: %w", err)
 	}
 	return &Store{db: db}, nil
 }

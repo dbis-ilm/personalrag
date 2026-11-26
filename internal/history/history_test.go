@@ -17,7 +17,7 @@ func TestConversationLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := New(st.DB())
+	h, err := New(st.DB(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestConversationLifecycle(t *testing.T) {
 	st.Close()
 	st, _ = store.Open(path, nil, "", 0)
 	defer st.Close()
-	h, _ = New(st.DB())
+	h, _ = New(st.DB(), "")
 	if err := h.MarkInterrupted(ctx); err != nil {
 		t.Fatal(err)
 	}
