@@ -9,7 +9,6 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
-	"github.com/wailsapp/wails/v3/pkg/icons"
 
 	"personalrag/internal/config"
 	"personalrag/internal/logging"
@@ -22,6 +21,18 @@ var version = "0.1.0-dev"
 //
 //go:embed all:frontend/dist
 var assets embed.FS
+
+// Icons (sources in build/icon-src): the app icon for the About box, a
+// monochrome template for the macOS menu bar, a colour icon for the
+// Windows notification area.
+var (
+	//go:embed build/appicon.png
+	appIcon []byte
+	//go:embed build/tray-template.png
+	trayTemplateIcon []byte
+	//go:embed build/tray-windows.png
+	trayWindowsIcon []byte
+)
 
 func init() {
 	// Typed events: the binding generator emits TS types for these.
@@ -76,6 +87,7 @@ func main() {
 		SingleInstance: singleInstance,
 		Name:           "PersonalRAG",
 		Description:    "Lokale Dokumentensuche mit belegten Antworten",
+		Icon:           appIcon,
 		Logger:         logs.Logger(slog.LevelWarn), // Wails logs each asset request at info
 		// Panics in bound methods and Wails goroutines are logged with their
 		// stack; fatal ones elsewhere reach logs/crash.log via the runtime.
@@ -132,9 +144,9 @@ func main() {
 
 	tray := app.SystemTray.New()
 	if runtime.GOOS == "darwin" {
-		tray.SetTemplateIcon(icons.SystrayMacTemplate)
+		tray.SetTemplateIcon(trayTemplateIcon)
 	} else {
-		tray.SetIcon(icons.SystrayLight)
+		tray.SetIcon(trayWindowsIcon)
 	}
 	tray.SetTooltip("PersonalRAG")
 

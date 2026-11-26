@@ -3,11 +3,11 @@ Version=1.0
 Name=PersonalRAG
 Comment=Lokale Dokumentensuche mit belegten Antworten
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/personalrag %u
+Exec=/usr/local/bin/PersonalRAG %u
 Terminal=false
 Type=Application
-Icon=personalrag
+Icon=PersonalRAG
 Categories=Utility;
-StartupWMClass=personalrag
+StartupWMClass=PersonalRAG
 
  

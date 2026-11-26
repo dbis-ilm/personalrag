@@ -9,8 +9,8 @@ info:
   productName: "PersonalRAG" # The name of the application
   productIdentifier: "app.personalrag" # The unique product identifier
   description: "Lokale Dokumentensuche mit belegten Antworten" # The application description
-  copyright: "(c) 2026" # Copyright text
-  comments: "" # Comments
+  copyright: "© 2026" # Copyright text
+  comments: "Lokale Dokumentensuche mit belegten Antworten" # Comments
   version: "0.1.0" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension

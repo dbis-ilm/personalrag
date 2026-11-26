@@ -5,7 +5,7 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "personalrag"
+    !define INFO_PROJECTNAME "PersonalRAG"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "PersonalRAG"

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- PersonalRAG glyph: a document with one highlighted line (the found
+       passage) under a magnifier. Transparent background; used as the
+       Icon Composer layer and inside appicon.svg. -->
+  <path d="M318 214 H600 L716 330 V746 a36 36 0 0 1 -36 36 H318 a36 36 0 0 1 -36 -36 V250 a36 36 0 0 1 36 -36 Z" fill="#FFFFFF"/>
+  <path d="M600 214 V294 a36 36 0 0 0 36 36 H716 Z" fill="#C9D6F5"/>
+  <rect x="344" y="402" width="300" height="30" rx="15" fill="#C9D6F5"/>
+  <rect x="344" y="466" width="250" height="30" rx="15" fill="#C9D6F5"/>
+  <rect x="332" y="522" width="300" height="50" rx="25" fill="#F5B33F"/>
+  <rect x="344" y="604" width="180" height="30" rx="15" fill="#C9D6F5"/>
+  <circle cx="618" cy="560" r="136" fill="#FFFFFF" fill-opacity="0.16" stroke="#F5B33F" stroke-width="46"/>
+  <path d="M718 660 L812 754" stroke="#F5B33F" stroke-width="64" stroke-linecap="round"/>
+</svg>

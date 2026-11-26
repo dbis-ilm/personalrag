@@ -3,7 +3,7 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "personalrag"
+name: "PersonalRAG"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.1.0"
@@ -17,12 +17,12 @@ license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/personalrag"
-    dst: "/usr/local/bin/personalrag"
+  - src: "./bin/PersonalRAG"
+    dst: "/usr/local/bin/PersonalRAG"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/personalrag.png"
-  - src: "./build/linux/personalrag.desktop"
-    dst: "/usr/share/applications/personalrag.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/PersonalRAG.png"
+  - src: "./build/linux/PersonalRAG.desktop"
+    dst: "/usr/share/applications/PersonalRAG.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

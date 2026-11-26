@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44">
+  <!-- Menu bar / tray template: black with alpha only, macOS tints it. -->
+  <path d="M11 6 H25 L32 13 V36 a2 2 0 0 1 -2 2 H11 a2 2 0 0 1 -2 -2 V8 a2 2 0 0 1 2 -2 Z" fill="none" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M14 16 H25 M14 21 H22" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="27" cy="27" r="7" fill="#fff" stroke="#000" stroke-width="3"/>
+  <path d="M32 32 L38 38" stroke="#000" stroke-width="4" stroke-linecap="round"/>
+</svg>

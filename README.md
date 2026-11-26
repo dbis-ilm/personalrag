@@ -14,7 +14,8 @@ Desktop-App (Wails v3 + React/TypeScript) für die lokale Suche in eigenen Dokum
 
 ```sh
 wails3 dev      # Entwicklungsmodus mit Hot-Reload
-wails3 build    # natives Binary nach bin/personalrag
+wails3 build    # natives Binary nach bin/PersonalRAG
+wails3 package  # macOS: bin/PersonalRAG.app mit Icon (Dock, Finder, Menüname)
 ```
 
 Beim ersten Start führt ein Assistent durch Runtime-Check, Modellwahl und den ersten Ordner. Daten liegen in `~/Library/Application Support/PersonalRAG` bzw. `%APPDATA%\PersonalRAG` (`settings.json`, `index.db`). Mit `PERSONALRAG_DATA=<dir>` lässt sich ein anderes Verzeichnis nutzen, z. B. zum Testen.
