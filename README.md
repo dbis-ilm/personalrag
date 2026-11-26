@@ -18,6 +18,8 @@ wails3 build    # natives Binary nach bin/personalrag
 
 Beim ersten Start führt ein Assistent durch Runtime-Check, Modellwahl und den ersten Ordner. Daten liegen in `~/Library/Application Support/PersonalRAG` bzw. `%APPDATA%\PersonalRAG` (`settings.json`, `index.db`). Mit `PERSONALRAG_DATA=<dir>` lässt sich ein anderes Verzeichnis nutzen, z. B. zum Testen.
 
+Das Protokoll liegt in `<Datenverzeichnis>/logs/personalrag.log` (rotiert bei 5 MB, drei ältere Dateien), Abstürze in `logs/crash*.log`. Die Stufe steht in den Einstellungen unter Diagnose oder kommt aus `PERSONALRAG_LOG_LEVEL` (`debug`, `info`, `warn`, `error`). Fragen und Dokumenttext stehen nur auf `debug` im Protokoll.
+
 ## Aufbau
 
 | Pfad | Inhalt |
@@ -28,7 +30,10 @@ Beim ersten Start führt ein Assistent durch Runtime-Check, Modellwahl und den e
 | `internal/ingest` | Extraktion (PDF, .docx über askyourdocs; Markdown, Text, HTML) und `IngestSource` je Datei |
 | `internal/indexer` | Ordner-Abgleich (Größe/mtime, Hash bei Änderung), Warteschlange mit Priorität, ein Worker, Genkit-Flow `indexFile` |
 | `internal/rag` | Hybride Suche (Vektor + FTS5, RRF), LLM-Reranking, gestreamte Antwort mit `[n]`-Zitaten; Prompts eingebettet |
-| `internal/config` | Einstellungen und Datenverzeichnis |
+| `internal/config` | Einstellungen, Datenverzeichnis, Kennung der Einzelinstanz |
+| `internal/logging` | Rotierendes Protokoll, Laufzeit-Stufe, Absturzdatei |
+| `internal/migrate` | Versionierte Schema-Migrationen je Komponente |
+| `internal/paths` | Pfadvergleich nach Plattformregeln |
 | `frontend/src/` | Ansichten Fragen, Quellen, Agenten, Einstellungen/Assistent |
 
 Generische Teile (`internal/store`, Markdown/Text-Extraktion, Prioritäten der Warteschlange) sollen nach askyourdocs wandern.

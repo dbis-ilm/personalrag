@@ -3,6 +3,8 @@ package main
 import (
 	"embed"
 	"log"
+	"log/slog"
+	"os"
 	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -10,7 +12,11 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/icons"
 
 	"personalrag/internal/config"
+	"personalrag/internal/logging"
 )
+
+// version is set at release time with -ldflags "-X main.version=…".
+var version = "0.1.0-dev"
 
 // The built frontend (frontend/dist) is embedded into the binary.
 //
@@ -32,7 +38,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("Datenverzeichnis: %v", err)
 	}
-	svc := NewAppService(dataDir)
+
+	// Logging first, so Genkit and Wails write to the same file.
+	// PERSONALRAG_LOG_LEVEL overrides the level from the settings.
+	settings, _ := config.Load(dataDir)
+	level := settings.LogLevel
+	if env := os.Getenv("PERSONALRAG_LOG_LEVEL"); env != "" {
+		level = env
+	}
+	logs, err := logging.Setup(dataDir, level)
+	if err != nil {
+		logs, err = logging.Setup(dataDir, "info")
+	}
+	if err != nil {
+		log.Fatalf("Protokoll: %v", err)
+	}
+	defer logs.Close()
+	slog.Info("starting", "version", version, "os", runtime.GOOS, "arch", runtime.GOARCH)
+
+	svc := NewAppService(dataDir, logs)
 
 	// One running app per data directory. A second launch hands over to the
 	// first (which comes to the front) and exits, so two processes never
@@ -52,6 +76,12 @@ func main() {
 		SingleInstance: singleInstance,
 		Name:           "PersonalRAG",
 		Description:    "Lokale Dokumentensuche mit belegten Antworten",
+		Logger:         logs.Logger(slog.LevelWarn), // Wails logs each asset request at info
+		// Panics in bound methods and Wails goroutines are logged with their
+		// stack; fatal ones elsewhere reach logs/crash.log via the runtime.
+		PanicHandler: func(d *application.PanicDetails) {
+			slog.Error("panic", "err", d.Error, "stack", d.StackTrace)
+		},
 		Services: []application.Service{
 			application.NewService(svc),
 		},

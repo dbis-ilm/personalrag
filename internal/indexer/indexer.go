@@ -292,17 +292,21 @@ func (ix *Indexer) ScanCollection(ctx context.Context, c store.Collection) error
 		}
 	}
 
+	removed := 0
 	for path, d := range byPath {
 		if !seen[path] {
 			if err := ix.st.DeleteDocument(ctx, d.ID); err != nil {
 				return err
 			}
 			changed = true
+			removed++
 		}
 	}
 	if changed && ix.onChange != nil {
 		ix.onChange()
 	}
+	// Counts only: file names stay out of the log at info.
+	slog.Info("scan done", "collection", c.ID, "files", len(seen), "queued", len(todo), "removed", removed)
 	ix.Enqueue(todo, c.ID, false)
 	return nil
 }
@@ -353,7 +357,7 @@ func (ix *Indexer) process(ctx context.Context, j job) {
 		note = "Kein Text gefunden"
 	}
 	_ = ix.st.SetDocumentState(ctx, id, store.StatusOK, note, hash)
-	slog.Info("indexed", "path", j.path, "chunks", n)
+	slog.Debug("indexed", "path", j.path, "chunks", n)
 }
 
 func isUnreachable(err error) bool {

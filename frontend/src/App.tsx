@@ -39,7 +39,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    AppService.Status().then(setStatus).catch(console.error)
+    AppService.Status().then((st) => {
+      setStatus(st)
+      if (st.lastCrash) toast(`PersonalRAG wurde am ${st.lastCrash} unerwartet beendet. Details unter Einstellungen › Diagnose.`, 'warn')
+    }).catch(console.error)
     AppService.IndexProgress().then(setProgress).catch(console.error)
     reloadCollections()
     reloadHistory()

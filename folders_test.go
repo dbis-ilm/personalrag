@@ -23,7 +23,7 @@ func TestAddFolderOverlap(t *testing.T) {
 	link := filepath.Join(base, "link-zu-vertraegen")
 	haveLink := os.Symlink(inner, link) == nil
 
-	s := NewAppService(filepath.Join(base, "data"))
+	s := NewAppService(filepath.Join(base, "data"), nil)
 	os.MkdirAll(filepath.Join(base, "data"), 0o700)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

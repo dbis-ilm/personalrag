@@ -18,6 +18,7 @@ type Settings struct {
 	Embedding    string `json:"embedding"` // model spec, e.g. "ollama/bge-m3"
 	EmbeddingDim int    `json:"embeddingDim"`
 	SetupDone    bool   `json:"setupDone"`
+	LogLevel     string `json:"logLevel,omitempty"` // debug | info | warn | error; empty = info
 }
 
 func Defaults() Settings {

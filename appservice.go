@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,6 +27,8 @@ import (
 	"personalrag/internal/history"
 	"personalrag/internal/indexer"
 	"personalrag/internal/ingest"
+	"personalrag/internal/logging"
+	"personalrag/internal/migrate"
 	"personalrag/internal/paths"
 	"personalrag/internal/rag"
 	"personalrag/internal/store"
@@ -55,6 +58,7 @@ type AppStatus struct {
 	Embedding  string `json:"embedding"`
 	Error      string `json:"error"`
 	DataDir    string `json:"dataDir"`
+	LastCrash  string `json:"lastCrash"` // when the previous run crashed; "" if it did not
 }
 
 type Collection struct {
@@ -216,6 +220,10 @@ type AccessLogEntry struct {
 type AppService struct {
 	dataDir string
 	appCtx  context.Context
+	logs    *logging.Logs // nil in tests
+
+	lastCrash string // label of the previous run's crash, if any
+	crashText string
 
 	mu       sync.RWMutex
 	settings config.Settings
@@ -245,12 +253,18 @@ type core struct {
 
 // NewAppService creates the service for one data directory (see
 // config.DataDir); main also derives the single-instance lock from it.
-func NewAppService(dataDir string) *AppService {
-	return &AppService{dataDir: dataDir, searches: map[int64]cachedSearch{}}
+func NewAppService(dataDir string, logs *logging.Logs) *AppService {
+	return &AppService{dataDir: dataDir, logs: logs, searches: map[int64]cachedSearch{}}
 }
 
 func (s *AppService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	s.appCtx = ctx
+	if s.logs != nil {
+		if when, text, ok := s.logs.TakeCrash(); ok {
+			s.lastCrash, s.crashText = when.Format("02.01.2006 15:04"), text
+			slog.Warn("previous run crashed", "at", when)
+		}
+	}
 	st, err := config.Load(s.dataDir)
 	if err != nil {
 		slog.Warn("settings unreadable, using defaults", "err", err)
@@ -292,6 +306,7 @@ func (s *AppService) restartCore() {
 	status := AppStatus{
 		SetupDone: cfg.SetupDone, DataDir: s.dataDir,
 		LLM: modelName(cfg.LLM), Embedding: modelName(cfg.Embedding), SearchOnly: cfg.LLM == "",
+		LastCrash: s.lastCrash,
 	}
 	if err != nil {
 		slog.Error("core start failed", "err", err)
@@ -1053,6 +1068,143 @@ func relTime(t time.Time) string {
 		return t.Format("02.01.")
 	}
 	return t.Format("02.01.2006")
+}
+
+// ---- Diagnostics ----
+
+// LogLevel returns the current log level (debug, info, warn, error).
+func (s *AppService) LogLevel() string {
+	if s.logs == nil {
+		return "info"
+	}
+	return s.logs.Level()
+}
+
+// SetLogLevel changes the level now and keeps it for the next start.
+func (s *AppService) SetLogLevel(level string) error {
+	if _, err := logging.ParseLevel(level); err != nil {
+		return err
+	}
+	if s.logs != nil {
+		if err := s.logs.SetLevel(level); err != nil {
+			return err
+		}
+	}
+	s.mu.RLock()
+	cfg := s.settings
+	s.mu.RUnlock()
+	cfg.LogLevel = level
+	return s.saveSettings(cfg)
+}
+
+// RevealLogs opens the log folder in Finder / Explorer.
+func (s *AppService) RevealLogs() error {
+	if s.logs == nil {
+		return errors.New("Kein Protokoll eingerichtet")
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", s.logs.Dir).Start()
+	case "windows":
+		return exec.Command("explorer", s.logs.Dir).Start()
+	default:
+		return exec.Command("xdg-open", s.logs.Dir).Start()
+	}
+}
+
+// Diagnostics returns a plain-text report for bug reports: versions,
+// settings, index statistics and the last log lines. It names no documents
+// or questions beyond what the log holds at its level; the UI shows it
+// before anything is copied.
+func (s *AppService) Diagnostics() string {
+	var b strings.Builder
+	line := func(format string, args ...any) { fmt.Fprintf(&b, format+"\n", args...) }
+
+	s.mu.RLock()
+	cfg, st := s.settings, s.status
+	s.mu.RUnlock()
+
+	line("PersonalRAG %s", version)
+	line("System: %s/%s, %s, Wails %s", runtime.GOOS, runtime.GOARCH, runtime.Version(), wailsVersion())
+	line("Datenverzeichnis: %s", displayPath(s.dataDir))
+	line("Protokollstufe: %s", s.LogLevel())
+	emb := "keins"
+	if cfg.Embedding != "" {
+		emb = fmt.Sprintf("%s (%d Dimensionen)", cfg.Embedding, cfg.EmbeddingDim)
+	}
+	llm := "keins (nur Suche)"
+	if cfg.LLM != "" {
+		llm = cfg.LLM
+	}
+	line("Modelle: Embedding %s, Antwort %s", emb, llm)
+	ollama := "erreichbar"
+	ctx, cancel := context.WithTimeout(s.appCtx, 3*time.Second)
+	if _, err := rag.OllamaModels(ctx, cfg.OllamaHost); err != nil {
+		ollama = "nicht erreichbar"
+	}
+	cancel()
+	line("Ollama: %s, %s", cfg.OllamaHost, ollama)
+	line("Status: bereit=%v, Einrichtung abgeschlossen=%v", st.Ready, st.SetupDone)
+	if st.Error != "" {
+		line("Fehler: %s", st.Error)
+	}
+
+	if c, err := s.current(); err == nil {
+		colls, _ := c.st.Collections(s.appCtx)
+		counts, _ := c.st.StatusCounts(s.appCtx)
+		total := 0
+		var parts []string
+		for _, k := range []string{store.StatusOK, store.StatusPending, store.StatusRunning, store.StatusError, store.StatusOCR, store.StatusCloud} {
+			if n := counts[k]; n > 0 {
+				parts = append(parts, fmt.Sprintf("%s %d", k, n))
+				total += n
+			}
+		}
+		line("Index: %d Sammlungen, %d Dokumente (%s)", len(colls), total, strings.Join(parts, ", "))
+		convs, _ := c.hist.List(s.appCtx, 1_000_000)
+		line("Verlauf: %d Unterhaltungen", len(convs))
+		vi, _ := migrate.Version(s.appCtx, c.st.DB(), "index")
+		vh, _ := migrate.Version(s.appCtx, c.st.DB(), "history")
+		line("Schema: index v%d, history v%d", vi, vh)
+		if c.ix != nil {
+			p := c.ix.Progress()
+			line("Indexierung: aktiv=%v, pausiert=%v, %d/%d", p.Active, p.Paused, p.Done, p.Total)
+		}
+	}
+
+	if s.crashText != "" {
+		line("")
+		line("--- Absturz am %s ---", s.lastCrash)
+		line("%s", redactHome(s.crashText))
+	}
+	if s.logs != nil {
+		line("")
+		line("--- Protokoll (letzte 200 Zeilen) ---")
+		for _, l := range s.logs.Tail(200) {
+			line("%s", redactHome(l))
+		}
+	}
+	return b.String()
+}
+
+// redactHome replaces the home directory with ~ in text.
+func redactHome(text string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return text
+	}
+	return strings.ReplaceAll(text, home, "~")
+}
+
+func wailsVersion() string {
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		for _, d := range bi.Deps {
+			if d.Path == "github.com/wailsapp/wails/v3" {
+				return d.Version
+			}
+		}
+	}
+	return "unbekannt"
 }
 
 // ---- Agents (MCP): UI only, server follows ----

@@ -169,6 +169,7 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
               </button>
             </div>
           </section>
+          <DiagnosticsCard lastCrash={status.lastCrash} />
         </div>
       </div>
     )
@@ -235,5 +236,74 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
         </div>
       </div>
     </div>
+  )
+}
+
+const LEVELS: { id: string; label: string }[] = [
+  { id: 'error', label: 'Nur Fehler' },
+  { id: 'warn', label: 'Warnungen' },
+  { id: 'info', label: 'Normal (empfohlen)' },
+  { id: 'debug', label: 'Ausführlich (mit Fragen und Textauszügen)' },
+]
+
+// DiagnosticsCard: log level, the log folder and a report to copy into a bug
+// report. The report is shown before it is copied, so nothing leaves
+// unseen.
+function DiagnosticsCard({ lastCrash }: { lastCrash: string }) {
+  const [level, setLevel] = useState('info')
+  const [report, setReport] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => { AppService.LogLevel().then(setLevel).catch(console.error) }, [])
+
+  const changeLevel = async (v: string) => {
+    try {
+      await AppService.SetLogLevel(v)
+      setLevel(v)
+      toast(v === 'debug' ? 'Ausführliches Protokoll an: Fragen und Textauszüge landen im Protokoll.' : 'Protokollstufe gespeichert', v === 'debug' ? 'warn' : 'ok')
+    } catch (e) {
+      toast(errorText(e), 'error')
+    }
+  }
+
+  const show = async () => {
+    setLoading(true)
+    try {
+      setReport(await AppService.Diagnostics())
+    } catch (e) {
+      toast(errorText(e), 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>Diagnose</h2>
+      {lastCrash && (
+        <div className="inline-note error"><Icon name="alert" size={13} strokeWidth={2.2} />PersonalRAG wurde am {lastCrash} unerwartet beendet. Details stehen im Bericht.</div>
+      )}
+      <div className="field">
+        <label htmlFor="loglevel">Protokoll</label>
+        <select id="loglevel" className="input select" value={level} onChange={(e) => changeLevel(e.target.value)}>
+          {LEVELS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+        </select>
+        <span className="muted" style={{ fontSize: 12 }}>Das Protokoll bleibt auf diesem Rechner. Fragen und Dokumenttext stehen nur bei „Ausführlich“ darin.</span>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <button type="button" className="btn" onClick={show} disabled={loading}>{loading ? 'Erstelle …' : report ? 'Bericht aktualisieren' : 'Diagnosebericht anzeigen'}</button>
+        <button type="button" className="btn" onClick={() => AppService.RevealLogs().catch((e) => toast(errorText(e), 'error'))}>Protokollordner öffnen</button>
+      </div>
+      {report && (
+        <>
+          <label htmlFor="diag" className="sr-only">Diagnosebericht</label>
+          <textarea id="diag" className="input diag" readOnly value={report} rows={14} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="muted" style={{ flex: 1, fontSize: 12 }}>Prüfe den Bericht, bevor du ihn weitergibst. Dein Benutzerordner ist durch ~ ersetzt.</span>
+            <button type="button" className="btn btn-primary" onClick={() => navigator.clipboard?.writeText(report).then(() => toast('Bericht kopiert'))}>Kopieren</button>
+          </div>
+        </>
+      )}
+    </section>
   )
 }

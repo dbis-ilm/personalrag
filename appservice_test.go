@@ -38,7 +38,7 @@ func TestServiceWithOllama(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	s := NewAppService(dataDir)
+	s := NewAppService(dataDir, nil)
 	if err := s.ServiceStartup(ctx, application.ServiceOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestServiceWithOllama(t *testing.T) {
 
 	// Settings survive a restart.
 	s.ServiceShutdown()
-	s2 := NewAppService(dataDir)
+	s2 := NewAppService(dataDir, nil)
 	if err := s2.ServiceStartup(ctx, application.ServiceOptions{}); err != nil {
 		t.Fatal(err)
 	}
