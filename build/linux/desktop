@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=PersonalRAG
+Comment=Lokale Dokumentensuche mit belegten Antworten
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/personalrag %u
+Terminal=false
+Type=Application
+Icon=personalrag
+Categories=Utility;
+StartupWMClass=personalrag
+
+ 
