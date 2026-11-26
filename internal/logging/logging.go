@@ -34,6 +34,7 @@ const (
 // Logs is the installed logging setup.
 type Logs struct {
 	Dir     string
+	file    string
 	level   *slog.LevelVar
 	w       *rotatingWriter
 	handler slog.Handler
@@ -62,9 +63,27 @@ func ParseLevel(s string) (slog.Level, error) {
 	return 0, fmt.Errorf("unbekannte Protokollstufe %q (debug, info, warn, error)", s)
 }
 
+// Options vary Setup for processes other than the app window.
+type Options struct {
+	// FileName within <dataDir>/logs; empty means personalrag.log.
+	FileName string
+	// NoCrashFile leaves crash.log alone: only the app reports crashes.
+	NoCrashFile bool
+}
+
 // Setup installs the process-wide handler writing to <dataDir>/logs. Call it
 // before genkit.Init so Genkit's records go to the same place.
 func Setup(dataDir, level string) (*Logs, error) {
+	return SetupWith(dataDir, level, Options{})
+}
+
+// SetupWith is Setup with options, e.g. a separate file for the MCP server,
+// which runs as its own process next to the app.
+func SetupWith(dataDir, level string, opts Options) (*Logs, error) {
+	name := opts.FileName
+	if name == "" {
+		name = fileName
+	}
 	lv, err := ParseLevel(level)
 	if err != nil {
 		return nil, err
@@ -73,17 +92,21 @@ func Setup(dataDir, level string) (*Logs, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
-	w, err := openRotating(filepath.Join(dir, fileName), maxSize, keep)
+	w, err := openRotating(filepath.Join(dir, name), maxSize, keep)
 	if err != nil {
 		return nil, err
 	}
-	l := &Logs{Dir: dir, level: new(slog.LevelVar), w: w}
+	l := &Logs{Dir: dir, file: name, level: new(slog.LevelVar), w: w}
 	l.level.Set(lv)
 
 	h := slog.NewTextHandler(io.MultiWriter(w, os.Stderr), &slog.HandlerOptions{Level: l.level})
 	l.handler = h
 	logger.SetDefaultHandler(h)             // Genkit filters through this handler's level
 	slog.SetLogLoggerLevel(slog.LevelError) // the standard log package lands at error
+
+	if opts.NoCrashFile {
+		return l, nil
+	}
 
 	// A crash file from the previous run is moved aside before the runtime
 	// opens it for this run (Windows cannot rename a file that is open).
@@ -144,7 +167,7 @@ func (l *Logs) Close() error { return l.w.Close() }
 // Tail returns up to n last lines of the log, older rotated file included
 // when the current one is short.
 func (l *Logs) Tail(n int) []string {
-	cur := filepath.Join(l.Dir, fileName)
+	cur := filepath.Join(l.Dir, l.file)
 	lines := readLines(cur)
 	if len(lines) < n {
 		lines = append(readLines(cur+".1"), lines...)

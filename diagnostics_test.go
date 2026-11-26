@@ -41,7 +41,7 @@ func TestDiagnostics(t *testing.T) {
 		t.Errorf("previous crash not in status: %+v", st)
 	}
 	d := s.Diagnostics()
-	for _, want := range []string{"PersonalRAG " + version, "System: ", "Schema: index v1, history v1", "Index: 0 Sammlungen", "--- Absturz am", "panic: runtime error", "marker-for-tail", "~/Dokumente/a.pdf"} {
+	for _, want := range []string{"PersonalRAG " + version, "System: ", "Schema: index v2, history v1", "Index: 0 Sammlungen", "--- Absturz am", "panic: runtime error", "marker-for-tail", "~/Dokumente/a.pdf"} {
 		if !strings.Contains(d, want) {
 			t.Errorf("diagnostics lack %q", want)
 		}

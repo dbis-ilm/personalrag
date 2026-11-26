@@ -61,6 +61,7 @@ type Engine struct {
 	rerank    ai.Prompt
 	qa        ai.Prompt
 	condense  ai.Prompt
+	extract   ai.Prompt
 }
 
 // New wires the engine. llm may be nil (search-only mode).
@@ -69,8 +70,9 @@ func New(g *genkit.Genkit, st *store.Store, llm ai.Model, llmConfig any) (*Engin
 	e.rerank = genkit.LookupPrompt(g, "rerank")
 	e.qa = genkit.LookupPrompt(g, "qa")
 	e.condense = genkit.LookupPrompt(g, "condense")
-	if e.rerank == nil || e.qa == nil || e.condense == nil {
-		return nil, errors.New("prompts rerank/qa/condense not loaded")
+	e.extract = genkit.LookupPrompt(g, "extract")
+	if e.rerank == nil || e.qa == nil || e.condense == nil || e.extract == nil {
+		return nil, errors.New("prompts rerank/qa/condense/extract not loaded")
 	}
 	return e, nil
 }
@@ -221,4 +223,33 @@ func firstNonEmpty(s ...string) string {
 		}
 	}
 	return ""
+}
+
+// NothingFound is what the extract prompt answers for a part without a match.
+const NothingFound = "(nichts gefunden)"
+
+// Extract applies instruction to each part of a document with the answer
+// model and returns one result per part. Parts are processed in order; a
+// cancelled ctx stops after the current part.
+func (e *Engine) Extract(ctx context.Context, instruction, document string, parts []string) ([]string, error) {
+	if e.llm == nil {
+		return nil, errors.New("kein Antwortmodell eingerichtet")
+	}
+	out := make([]string, 0, len(parts))
+	for i, p := range parts {
+		if err := ctx.Err(); err != nil {
+			return out, err
+		}
+		resp, err := e.extract.Execute(ctx, askyourdocs.PromptOptions(e.llm, e.llmConfig, map[string]any{
+			"instruction": askyourdocs.SanitizeUntrusted(instruction),
+			"document":    askyourdocs.SanitizeUntrusted(document),
+			"part":        fmt.Sprintf("Teil %d von %d", i+1, len(parts)),
+			"text":        askyourdocs.WrapUntrusted("document", p),
+		})...)
+		if err != nil {
+			return out, fmt.Errorf("Teil %d: %w", i+1, err)
+		}
+		out = append(out, strings.TrimSpace(resp.Text()))
+	}
+	return out, nil
 }

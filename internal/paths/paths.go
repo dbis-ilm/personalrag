@@ -85,3 +85,11 @@ func trueCase(p string) string {
 	}
 	return cur
 }
+
+// Display shortens p for people: the home directory becomes ~.
+func Display(p string) string {
+	if home, err := os.UserHomeDir(); err == nil && Within(p, home) {
+		return "~" + p[len(filepath.Clean(home)):]
+	}
+	return p
+}

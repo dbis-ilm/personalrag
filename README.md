@@ -14,9 +14,10 @@ It is built with [Wails v3](https://v3.wails.io) (Go backend, React/TypeScript U
 - **Cited answers:** the top passages are reranked by the model, the answer streams in with `[n]` citations, and each citation opens its source passage. A confidence rating says how well the sources matched.
 - **Conversations:** follow-up questions are rewritten into standalone questions before searching. Conversations are stored locally with a snapshot of the cited passages, so they reopen exactly as answered.
 - **Local by default:** Ollama on this machine for embeddings and answers. Alternatively an OpenAI-compatible server such as [GPUStack](https://github.com/gpustack/gpustack), LM Studio or llama.cpp, by URL and API key. A server that is not on this machine requires your explicit consent before any excerpt is sent to it.
+- **Agents (MCP):** OpenCode, Claude Desktop, Claude Code, Cursor and other MCP clients can list, read, search and extract from the collections you share, read-only. Every call is logged in the app. See [Using PersonalRAG with agents](#using-personalrag-with-agents).
 - **Desktop behaviour:** runs in the menu bar / notification area, closing the window keeps indexing, one instance per data directory, light and dark mode.
 
-Planned next: an MCP server so agents such as Claude Desktop, Claude Code or Cursor can search shared collections; a file system watcher; OCR; signed installers. See [Roadmap](#roadmap).
+Planned next: a file system watcher, OCR, MCP over HTTP for the running app, signed installers. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -68,6 +69,37 @@ Environment variables:
 | `PERSONALRAG_DATA` | Use another data directory, e.g. for testing. Each data directory has its own single-instance lock. |
 | `PERSONALRAG_LOG_LEVEL` | `debug`, `info`, `warn` or `error`; overrides the setting. |
 
+## Using PersonalRAG with agents
+
+An MCP client starts the app binary with `--mcp` and talks to it over stdio; the app window does not need to be open. Agents see only the collections you share under **Agents** in the app, and every tool call appears in the access log there. The same screen shows ready-made configuration for each client with the right path to the binary.
+
+OpenCode (`opencode.json` in a project or `~/.config/opencode/opencode.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "personalrag": {
+      "type": "local",
+      "command": ["/Applications/PersonalRAG.app/Contents/MacOS/PersonalRAG", "--mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Claude Code: `claude mcp add personalrag -- /Applications/PersonalRAG.app/Contents/MacOS/PersonalRAG --mcp`
+
+| Tool | Purpose |
+| --- | --- |
+| `list_collections` | Shared collections and their document counts |
+| `list_documents` | Every document of the shared collections, filterable by collection, folder, format and date, paged. Includes documents that could not be read (e.g. scans needing OCR), so an evaluation can report what it did not cover |
+| `read_document` | Full text of one document, paged by characters, with `[Seite n]` page markers |
+| `search_documents` | Hybrid search; returns the most relevant passages, not all matches |
+| `extract` | Applies an instruction to one whole document with *your* model (e.g. "list the names under Anwesend") and returns only the result |
+
+Search answers questions; it does not cover every document. For evaluations over a whole collection, such as listing all participants of all meetings and counting how often each attended, let the agent call `list_documents`, then `extract` (or `read_document`) for each document, and count with code. The server tells the client this in its instructions. With `extract`, the document text stays with your model and only the result reaches the agent; with `read_document`, the agent's model sees the text. If the agent runs on a cloud model, that text goes to its provider.
+
 ## How it works
 
 ```
@@ -89,6 +121,7 @@ Indexing runs on one background worker so it never competes with itself for the 
 | `main.go` | Window, tray, file drop, single instance, logging setup |
 | `appservice.go` | API bound to the UI: lifecycle of index, indexer and engine; collections, search, answers, conversations, diagnostics |
 | `connections.go` | Model providers (Ollama, OpenAI-compatible), model selection with consent for remote servers, exclusion patterns |
+| `internal/agent` | MCP server and its tools (official Go SDK), sharing checks, access log |
 | `internal/store` | SQLite index with FTS5 and sqlite-vec |
 | `internal/ingest` | Text extraction per format and the `IngestSource` for local files |
 | `internal/indexer` | Folder sync, priority queue, single worker |
@@ -123,7 +156,7 @@ To change the icon, edit the SVGs in `build/icon-src`, render `build/appicon.png
 
 1. **Foundation and Windows:** run and test on Windows hardware; CI on both platforms.
 2. **Index and answer quality:** file system watcher, cloud placeholders (iCloud, OneDrive), evaluation on a real corpus, OCR, more formats (.eml, .pptx, .xlsx), filters by file type and date.
-3. **MCP for agents:** read-only tools (`search_documents`, `read_document`, `list_collections`, …) over stdio and Streamable HTTP, per-collection sharing, access log.
+3. **MCP for agents:** stdio server with read-only tools, per-collection sharing and access log are done; next: Streamable HTTP for the running app with token and origin checks.
 4. **Distribution:** signed and notarised macOS package, Windows installer, update notice, autostart, quick-ask window.
 
 ## License

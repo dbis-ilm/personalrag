@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { AppService, AccessLogEntry, ClientConfig, Collection, MCPStatus } from '../../bindings/personalrag'
-import Icon from '../components/Icon'
 import { toast } from '../components/Toasts'
 import { errorText } from '../App'
 
@@ -45,19 +44,17 @@ export default function AgentsView({ collections, onChanged }: {
         <div className="page-head" style={{ alignItems: 'flex-start' }}>
           <div className="grow">
             <h1>Agenten (MCP)</h1>
-            <p className="lead">Claude, Cursor und andere Clients durchsuchen freigegebene Sammlungen. Standardmäßig nur lesend.</p>
+            <p className="lead">OpenCode, Claude, Cursor und andere MCP-Clients lesen und durchsuchen die Sammlungen, die du freigibst. Nur lesend, jeder Zugriff wird protokolliert.</p>
           </div>
           {status && (
             <div className="status-pill" style={{ background: status.running ? 'var(--ok-bg)' : 'var(--info-bg)' }}>
               <span className="dot" style={{ width: 9, height: 9, borderRadius: 5, background: status.running ? 'var(--ok-dot)' : '#9a9ea6' }} />
-              <span className={status.running ? 'text-ok' : 'text-info'} style={{ fontSize: 13, fontWeight: 650 }}>{status.running ? 'Server läuft' : 'Server noch nicht verfügbar'}</span>
+              <span className={status.running ? 'text-ok' : 'text-info'} style={{ fontSize: 13, fontWeight: 650 }}>{status.running ? 'Bereit für Agenten (MCP über stdio)' : 'Nicht verfügbar'}</span>
             </div>
           )}
         </div>
 
-        {status?.note && (
-          <div className="inline-note"><Icon name="alert" size={13} strokeWidth={2.2} />{status.note}</div>
-        )}
+        {status?.note && <p className="lead" style={{ marginTop: -8 }}>{status.note}</p>}
 
         <div className="grid-2">
           <section className="card" aria-labelledby="h-connect">
@@ -80,7 +77,7 @@ export default function AgentsView({ collections, onChanged }: {
 
           <section className="card" aria-labelledby="h-share" style={{ gap: 8 }}>
             <h2 id="h-share">Freigabe je Sammlung</h2>
-            <p className="muted" style={{ margin: 0, fontSize: 13 }}>Nur freigegebene Sammlungen werden für Agenten sichtbar sein. Neue Sammlungen sind privat.</p>
+            <p className="muted" style={{ margin: 0, fontSize: 13 }}>Agenten sehen nur freigegebene Sammlungen, die übrigen existieren für sie nicht. Neue Sammlungen sind privat. Läuft der Agent mit einem Cloud-Modell, gehen gelesene Texte an dessen Anbieter.</p>
             {collections.length === 0 && <p className="muted" style={{ margin: 0, fontSize: 13 }}>Noch keine Sammlungen.</p>}
             {collections.map((c) => (
               <div key={c.id} className="share-row">

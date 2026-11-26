@@ -230,3 +230,63 @@ func (s *FileSource) Documents(chunks []askyourdocs.Chunk) []*ai.Document {
 func (s *FileSource) DeleteStale(ctx context.Context, vs askyourdocs.VectorStore) (int, error) {
 	return vs.DeleteByURL(ctx, s.Path)
 }
+
+// PlainText renders paragraphs as readable text for an agent: paragraphs
+// separated by blank lines, headings as Markdown headings, and a "[Seite n]"
+// marker wherever the page changes (paged formats only).
+func PlainText(paras []askyourdocs.Paragraph) string {
+	var b strings.Builder
+	page := 0
+	for _, p := range paras {
+		text := strings.TrimSpace(p.Text)
+		if text == "" {
+			continue
+		}
+		if p.PageNum > 0 && p.PageNum != page {
+			page = p.PageNum
+			if b.Len() > 0 {
+				b.WriteString("\n\n")
+			}
+			fmt.Fprintf(&b, "[Seite %d]", page)
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		if p.Heading {
+			b.WriteString("## ")
+		}
+		b.WriteString(text)
+	}
+	return b.String()
+}
+
+// SplitText cuts text into parts of at most max runes, at paragraph
+// boundaries where possible, so each part can go to a model on its own.
+func SplitText(text string, max int) []string {
+	var parts []string
+	var cur strings.Builder
+	curLen := 0
+	flush := func() {
+		if s := strings.TrimSpace(cur.String()); s != "" {
+			parts = append(parts, s)
+		}
+		cur.Reset()
+		curLen = 0
+	}
+	for _, para := range strings.Split(text, "\n\n") {
+		n := len([]rune(para)) + 2
+		if curLen > 0 && curLen+n > max {
+			flush()
+		}
+		// A single paragraph longer than max is cut hard.
+		for r := []rune(para); len(r) > max; r = []rune(para) {
+			parts = append(parts, string(r[:max]))
+			para = string(r[max:])
+		}
+		cur.WriteString(para)
+		cur.WriteString("\n\n")
+		curLen += len([]rune(para)) + 2
+	}
+	flush()
+	return parts
+}

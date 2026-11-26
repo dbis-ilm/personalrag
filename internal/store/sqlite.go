@@ -157,6 +157,13 @@ var indexSteps = []migrate.Step{
 		`CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(text, section, tokenize = 'unicode61 remove_diacritics 2')`,
 		`DELETE FROM meta WHERE key = 'schema_version'`,
 	)},
+	{Version: 2, Name: "agent access log", Up: migrate.Exec(
+		`CREATE TABLE IF NOT EXISTS agent_log (
+			id INTEGER PRIMARY KEY, at INTEGER NOT NULL, client TEXT NOT NULL DEFAULT '',
+			tool TEXT NOT NULL, request TEXT NOT NULL DEFAULT '', result TEXT NOT NULL DEFAULT '',
+			kind TEXT NOT NULL DEFAULT 'ok')`,
+		`CREATE INDEX IF NOT EXISTS agent_log_at ON agent_log(at DESC)`,
+	)},
 }
 
 func (s *Store) migrate(path string) error {
@@ -698,4 +705,52 @@ func toInt64(v any) (int64, bool) {
 		return int64(n), true
 	}
 	return 0, false
+}
+
+// ---- Agent access log ----
+
+// AccessEntry is one tool call by an agent (MCP client).
+type AccessEntry struct {
+	At      time.Time
+	Client  string
+	Tool    string
+	Request string
+	Result  string
+	Kind    string // ok | warn | denied | error
+}
+
+// maxAccessLog caps the log; older entries are dropped.
+const maxAccessLog = 5000
+
+// LogAccess records an agent's tool call.
+func (s *Store) LogAccess(ctx context.Context, e AccessEntry) error {
+	if e.At.IsZero() {
+		e.At = time.Now()
+	}
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO agent_log(at, client, tool, request, result, kind) VALUES (?, ?, ?, ?, ?, ?)`,
+		e.At.UnixMilli(), e.Client, e.Tool, e.Request, e.Result, e.Kind); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM agent_log WHERE id <= (SELECT max(id) FROM agent_log) - ?`, maxAccessLog)
+	return err
+}
+
+// AccessLog returns the newest entries first.
+func (s *Store) AccessLog(ctx context.Context, limit int) ([]AccessEntry, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT at, client, tool, request, result, kind FROM agent_log ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AccessEntry
+	for rows.Next() {
+		var e AccessEntry
+		var at int64
+		if err := rows.Scan(&at, &e.Client, &e.Tool, &e.Request, &e.Result, &e.Kind); err != nil {
+			return nil, err
+		}
+		e.At = time.UnixMilli(at)
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }

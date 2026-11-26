@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"embed"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -48,6 +54,10 @@ func main() {
 	dataDir, err := config.DataDir()
 	if err != nil {
 		log.Fatalf("Datenverzeichnis: %v", err)
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "--mcp" {
+		os.Exit(runMCP(dataDir))
 	}
 
 	// Logging first, so Genkit and Wails write to the same file.
@@ -163,4 +173,44 @@ func main() {
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// runMCP serves the MCP tools over stdio for an agent client that started
+// PersonalRAG with --mcp. It runs next to the app (or without it) on the
+// same index, without a window, the single-instance lock or indexing.
+// Stdout belongs to the protocol: logs go to logs/mcp.log and stderr.
+func runMCP(dataDir string) int {
+	settings, _ := config.Load(dataDir)
+	level := settings.LogLevel
+	if env := os.Getenv("PERSONALRAG_LOG_LEVEL"); env != "" {
+		level = env
+	}
+	logs, err := logging.SetupWith(dataDir, level, logging.Options{FileName: "mcp.log", NoCrashFile: true})
+	if err != nil {
+		logs, _ = logging.SetupWith(dataDir, "info", logging.Options{FileName: "mcp.log", NoCrashFile: true})
+	}
+	if logs != nil {
+		defer logs.Close()
+	}
+	slog.Info("mcp starting", "version", version)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	svc := NewAppService(dataDir, logs)
+	svc.agentMode = true
+	if err := svc.ServiceStartup(ctx, application.ServiceOptions{}); err != nil {
+		fmt.Fprintln(os.Stderr, "PersonalRAG:", err)
+		return 1
+	}
+	defer svc.ServiceShutdown()
+	srv, err := svc.AgentServer()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "PersonalRAG ist nicht bereit:", err)
+		return 1
+	}
+	if err := srv.MCP().Run(ctx, &mcp.StdioTransport{}); err != nil && ctx.Err() == nil {
+		slog.Error("mcp stopped", "err", err)
+		return 1
+	}
+	return 0
 }

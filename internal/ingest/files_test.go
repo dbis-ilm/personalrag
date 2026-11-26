@@ -3,6 +3,7 @@ package ingest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dbis-ilm/askyourdocs"
@@ -61,5 +62,35 @@ func TestPatterns(t *testing.T) {
 	}
 	if ValidatePattern("*.bak") != nil {
 		t.Error("valid pattern refused")
+	}
+}
+
+func TestPlainTextAndSplit(t *testing.T) {
+	paras := []askyourdocs.Paragraph{
+		{Text: "Protokoll", PageNum: 1, Heading: true},
+		{Text: "Anwesend: A, B", PageNum: 1},
+		{Text: "Beschluss", PageNum: 2},
+	}
+	got := PlainText(paras)
+	want := "[Seite 1]\n\n## Protokoll\n\nAnwesend: A, B\n\n[Seite 2]\n\nBeschluss"
+	if got != want {
+		t.Fatalf("PlainText = %q, want %q", got, want)
+	}
+	if PlainText([]askyourdocs.Paragraph{{Text: "x"}, {Text: "y"}}) != "x\n\ny" {
+		t.Error("non-paged text got page markers")
+	}
+
+	text := "aaaa\n\nbbbb\n\ncccc\n\n" + strings.Repeat("d", 25)
+	parts := SplitText(text, 12)
+	for _, p := range parts {
+		if len([]rune(p)) > 12 {
+			t.Errorf("part too long: %q", p)
+		}
+	}
+	if strings.Join(parts, "") != strings.ReplaceAll(text, "\n\n", "") && len(parts) < 4 {
+		t.Errorf("parts = %q", parts)
+	}
+	if parts[0] != "aaaa\n\nbbbb" {
+		t.Errorf("paragraphs not kept together: %q", parts[0])
 	}
 }

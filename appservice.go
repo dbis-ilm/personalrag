@@ -23,6 +23,7 @@ import (
 
 	"github.com/dbis-ilm/askyourdocs"
 
+	"personalrag/internal/agent"
 	"personalrag/internal/config"
 	"personalrag/internal/history"
 	"personalrag/internal/indexer"
@@ -210,6 +211,10 @@ type AppService struct {
 	appCtx  context.Context
 	logs    *logging.Logs // nil in tests
 
+	// agentMode: serving MCP next to the app (PersonalRAG --mcp). Reads the
+	// index and logs agent calls, but never indexes or resets anything.
+	agentMode bool
+
 	lastCrash string // label of the previous run's crash, if any
 	crashText string
 
@@ -361,6 +366,10 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 		// The settings are authoritative: a new embedding model means the
 		// old vectors are useless. Re-index everything.
 		slog.Warn("embedding model changed, resetting vectors", "err", err)
+		if s.agentMode {
+			// Re-indexing is the app's job; agents wait for it.
+			return fail(errors.New("der Index wird für ein neues Embedding-Modell neu aufgebaut; bitte PersonalRAG öffnen"))
+		}
 		err = c.st.ResetVectors()
 	}
 	if err != nil {
@@ -381,11 +390,13 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 	if c.hist, err = history.New(c.st.DB(), filepath.Join(s.dataDir, "index.db.history.bak")); err != nil {
 		return fail(err)
 	}
-	if err := c.hist.MarkInterrupted(ctx); err != nil {
+	if s.agentMode {
+		// The app may be streaming an answer right now; leave its turns alone.
+	} else if err := c.hist.MarkInterrupted(ctx); err != nil {
 		slog.Warn("history: marking interrupted answers failed", "err", err)
 	}
 
-	if emb != nil {
+	if emb != nil && !s.agentMode {
 		c.ix = indexer.New(g, c.st, func(p indexer.Progress) { s.emit(EventIndexProgress, toProgress(p)) }, s.sourcesChanged)
 		c.ix.SetExcludes(cfg.Exclude)
 		c.wg.Add(2)
@@ -1137,10 +1148,40 @@ func wailsVersion() string {
 	return "unbekannt"
 }
 
-// ---- Agents (MCP): UI only, server follows ----
+// ---- Agents (MCP) ----
 
+// AgentServer returns the MCP server over the current index and engine; used
+// by the --mcp mode.
+func (s *AppService) AgentServer() (*agent.Server, error) {
+	c, err := s.current()
+	if err != nil {
+		return nil, err
+	}
+	return agent.New(c.st, c.eng, version), nil
+}
+
+// MCPStatus describes how agents reach PersonalRAG: a client starts the app
+// binary with --mcp and talks MCP over stdio.
 func (s *AppService) MCPStatus() MCPStatus {
-	return MCPStatus{Note: "Der MCP-Server ist noch nicht eingebaut. Freigaben werden schon gespeichert."}
+	st := MCPStatus{Running: true, Address: "stdio"}
+	shared := 0
+	if c, err := s.current(); err == nil {
+		colls, _ := c.st.Collections(s.appCtx)
+		for _, cl := range colls {
+			if cl.SharedWithAgents {
+				shared++
+			}
+		}
+	}
+	switch shared {
+	case 0:
+		st.Note = "Noch keine Sammlung freigegeben: Agenten sehen nichts, bis du unten eine freigibst."
+	case 1:
+		st.Note = "Agenten sehen 1 freigegebene Sammlung, nur lesend. Der Client startet PersonalRAG dafür selbst, die App muss nicht geöffnet sein."
+	default:
+		st.Note = fmt.Sprintf("Agenten sehen %d freigegebene Sammlungen, nur lesend. Der Client startet PersonalRAG dafür selbst, die App muss nicht geöffnet sein.", shared)
+	}
+	return st
 }
 
 func (s *AppService) ClientConfigs() []ClientConfig {
@@ -1150,8 +1191,22 @@ func (s *AppService) ClientConfigs() []ClientConfig {
 	}
 	return []ClientConfig{
 		{
+			Name: "OpenCode",
+			Hint: "In opencode.json im Projekt oder in ~/.config/opencode/opencode.json eintragen.",
+			Snippet: fmt.Sprintf(`{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "personalrag": {
+      "type": "local",
+      "command": [%q, "--mcp"],
+      "enabled": true
+    }
+  }
+}`, exe),
+		},
+		{
 			Name: "Claude Desktop",
-			Hint: "In claude_desktop_config.json eintragen. Claude Desktop startet die App als stdio-Brücke.",
+			Hint: "In claude_desktop_config.json eintragen und Claude Desktop neu starten.",
 			Snippet: fmt.Sprintf(`{
   "mcpServers": {
     "personalrag": {
@@ -1163,7 +1218,7 @@ func (s *AppService) ClientConfigs() []ClientConfig {
 		},
 		{
 			Name:    "Claude Code",
-			Hint:    "Im Terminal ausführen (stdio-Brücke).",
+			Hint:    "Im Terminal ausführen.",
 			Snippet: fmt.Sprintf(`claude mcp add personalrag -- %q --mcp`, exe),
 		},
 		{
@@ -1178,7 +1233,22 @@ func (s *AppService) ClientConfigs() []ClientConfig {
 	}
 }
 
-func (s *AppService) AccessLog() []AccessLogEntry { return []AccessLogEntry{} }
+// AccessLog lists the newest agent tool calls.
+func (s *AppService) AccessLog() []AccessLogEntry {
+	out := []AccessLogEntry{}
+	c, err := s.current()
+	if err != nil {
+		return out
+	}
+	entries, err := c.st.AccessLog(s.appCtx, 200)
+	if err != nil {
+		return out
+	}
+	for _, e := range entries {
+		out = append(out, AccessLogEntry{Time: relTime(e.At), Client: firstNonEmpty(e.Client, "unbekannt"), Tool: e.Tool, Query: e.Request, Result: e.Result, Kind: e.Kind})
+	}
+	return out
+}
 
 // ---- helpers ----
 
@@ -1299,12 +1369,7 @@ func truncate(s string, n int) string {
 	return s
 }
 
-func displayPath(p string) string {
-	if home, err := os.UserHomeDir(); err == nil && paths.Within(p, home) {
-		return "~" + p[len(filepath.Clean(home)):]
-	}
-	return p
-}
+func displayPath(p string) string { return paths.Display(p) }
 
 func modelName(spec string) string {
 	if spec == "" {
