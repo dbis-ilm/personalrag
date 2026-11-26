@@ -31,6 +31,7 @@ import (
 	"personalrag/internal/migrate"
 	"personalrag/internal/paths"
 	"personalrag/internal/rag"
+	"personalrag/internal/secrets"
 	"personalrag/internal/store"
 )
 
@@ -59,6 +60,10 @@ type AppStatus struct {
 	Error      string `json:"error"`
 	DataDir    string `json:"dataDir"`
 	LastCrash  string `json:"lastCrash"` // when the previous run crashed; "" if it did not
+	// Remote is the host that receives document excerpts ("" = all local);
+	// LLMProvider is "Ollama" or "GPUStack".
+	Remote      string `json:"remote"`
+	LLMProvider string `json:"llmProvider"`
 }
 
 type Collection struct {
@@ -163,23 +168,6 @@ type Document struct {
 	Status     string `json:"status"` // pending | running | ok | error | ocr | cloud
 	Note       string `json:"note"`
 	Chunks     int    `json:"chunks"`
-}
-
-type ModelInfo struct {
-	Name      string `json:"name"`
-	Size      string `json:"size"`
-	Embedding bool   `json:"embedding"`
-}
-
-type RuntimeInfo struct {
-	OllamaOK           bool        `json:"ollamaOk"`
-	Host               string      `json:"host"`
-	Error              string      `json:"error"`
-	Models             []ModelInfo `json:"models"`
-	LLM                string      `json:"llm"`       // currently configured (Ollama name)
-	Embedding          string      `json:"embedding"` // currently configured (Ollama name)
-	SuggestedLLM       string      `json:"suggestedLlm"`
-	SuggestedEmbedding string      `json:"suggestedEmbedding"`
 }
 
 type Notice struct {
@@ -306,7 +294,7 @@ func (s *AppService) restartCore() {
 	status := AppStatus{
 		SetupDone: cfg.SetupDone, DataDir: s.dataDir,
 		LLM: modelName(cfg.LLM), Embedding: modelName(cfg.Embedding), SearchOnly: cfg.LLM == "",
-		LastCrash: s.lastCrash,
+		LastCrash: s.lastCrash, Remote: remoteHost(cfg), LLMProvider: providerLabel(providerOf(cfg.LLM)),
 	}
 	if err != nil {
 		slog.Error("core start failed", "err", err)
@@ -335,6 +323,17 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 		return nil, err
 	}
 
+	if err := checkConsent(cfg); err != nil {
+		return fail(err)
+	}
+	gpuKey := ""
+	if cfg.GPUStackURL != "" {
+		var err error
+		if gpuKey, err = secrets.Get(secrets.GPUStackKey); err != nil {
+			return fail(fmt.Errorf("Schlüsselbund: %w", err))
+		}
+	}
+
 	var specs []string
 	if cfg.Embedding != "" {
 		specs = append(specs, cfg.Embedding)
@@ -343,7 +342,7 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 		specs = append(specs, cfg.LLM)
 	}
 	providers, err := askyourdocs.NewProviders(
-		askyourdocs.ProviderConfig{OllamaHost: cfg.OllamaHost, Timeout: 3 * time.Minute},
+		askyourdocs.ProviderConfig{OllamaHost: cfg.OllamaHost, GPUStackURL: cfg.GPUStackURL, GPUStackAPIKey: gpuKey, Timeout: 3 * time.Minute},
 		[]string{askyourdocs.ProviderOllama, askyourdocs.ProviderGPUStack}, specs...)
 	if err != nil {
 		return fail(err)
@@ -388,6 +387,7 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 
 	if emb != nil {
 		c.ix = indexer.New(g, c.st, func(p indexer.Progress) { s.emit(EventIndexProgress, toProgress(p)) }, s.sourcesChanged)
+		c.ix.SetExcludes(cfg.Exclude)
 		c.wg.Add(2)
 		go func() { defer c.wg.Done(); c.ix.Run(ctx) }()
 		go func() {
@@ -448,76 +448,6 @@ func (s *AppService) Status() AppStatus {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.status
-}
-
-// RuntimeInfo checks Ollama and lists installed models with suggestions.
-func (s *AppService) RuntimeInfo() RuntimeInfo {
-	s.mu.RLock()
-	cfg := s.settings
-	s.mu.RUnlock()
-	info := RuntimeInfo{Host: cfg.OllamaHost, LLM: modelName(cfg.LLM), Embedding: modelName(cfg.Embedding), Models: []ModelInfo{}}
-	ctx, cancel := context.WithTimeout(s.appCtx, 5*time.Second)
-	defer cancel()
-	models, err := rag.OllamaModels(ctx, cfg.OllamaHost)
-	if err != nil {
-		info.Error = "Ollama ist unter " + cfg.OllamaHost + " nicht erreichbar."
-		return info
-	}
-	info.OllamaOK = true
-	var llms, embs []string
-	for _, m := range models {
-		info.Models = append(info.Models, ModelInfo{Name: m.Name, Size: fmt.Sprintf("%.1f GB", float64(m.Size)/1e9), Embedding: m.Embedding})
-		if m.Embedding {
-			embs = append(embs, m.Name)
-		} else {
-			llms = append(llms, m.Name)
-		}
-	}
-	info.SuggestedEmbedding = prefer(embs, "bge-m3", "nomic-embed-text", "mxbai-embed-large")
-	info.SuggestedLLM = prefer(llms, "gemma4:12b", "qwen3:8b", "gemma3:12b", "llama3.1:8b")
-	return info
-}
-
-func prefer(names []string, wanted ...string) string {
-	for _, w := range wanted {
-		for _, n := range names {
-			if n == w || strings.TrimSuffix(n, ":latest") == w {
-				return n
-			}
-		}
-	}
-	if len(names) > 0 {
-		return names[0]
-	}
-	return ""
-}
-
-// SaveModels sets the Ollama models (names as Ollama lists them; llm may be
-// empty for search-only) and restarts the core. Changing the embedding model
-// re-indexes everything.
-func (s *AppService) SaveModels(llm, embedding string) error {
-	if embedding == "" {
-		return errors.New("Ein Embedding-Modell ist erforderlich")
-	}
-	s.mu.RLock()
-	cfg := s.settings
-	s.mu.RUnlock()
-	ctx, cancel := context.WithTimeout(s.appCtx, 10*time.Second)
-	defer cancel()
-	dim, err := rag.EmbeddingDim(ctx, cfg.OllamaHost, embedding)
-	if err != nil {
-		return fmt.Errorf("Embedding-Modell %s: %w", embedding, err)
-	}
-	cfg.Embedding, cfg.EmbeddingDim = "ollama/"+embedding, dim
-	cfg.LLM = ""
-	if llm != "" {
-		cfg.LLM = "ollama/" + llm
-	}
-	if err := s.saveSettings(cfg); err != nil {
-		return err
-	}
-	go s.restartCore()
-	return nil
 }
 
 func (s *AppService) FinishSetup() error {

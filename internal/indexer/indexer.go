@@ -70,6 +70,8 @@ type Indexer struct {
 	wake     chan struct{}
 	collName map[string]string
 	scanning sync.Mutex
+	excludes []string // user patterns, matched against file and folder names
+
 }
 
 // New creates an indexer and defines its "indexFile" flow on g (askyourdocs
@@ -144,6 +146,22 @@ func (ix *Indexer) signal() {
 	case ix.wake <- struct{}{}:
 	default:
 	}
+}
+
+// SetExcludes sets name patterns (filepath.Match syntax, e.g. "*.tmp",
+// "Archiv") that skip matching files and folders on the next scan; already
+// indexed documents that now match are removed then.
+func (ix *Indexer) SetExcludes(patterns []string) {
+	ix.mu.Lock()
+	ix.excludes = append([]string(nil), patterns...)
+	ix.mu.Unlock()
+}
+
+func (ix *Indexer) excluded(name string) bool {
+	ix.mu.Lock()
+	pats := ix.excludes
+	ix.mu.Unlock()
+	return ingest.MatchesAny(name, pats)
 }
 
 // Enqueue adds files; front puts them ahead of the background backlog
@@ -251,12 +269,12 @@ func (ix *Indexer) ScanCollection(ctx context.Context, c store.Collection) error
 				return ctx.Err()
 			}
 			if d.IsDir() {
-				if path != root && ingest.SkipDir(d.Name()) {
+				if path != root && (ingest.SkipDir(d.Name()) || ix.excluded(d.Name())) {
 					return fs.SkipDir
 				}
 				return nil
 			}
-			if ingest.SkipFile(d.Name()) || !ingest.Supported(path) {
+			if ingest.SkipFile(d.Name()) || !ingest.Supported(path) || ix.excluded(d.Name()) {
 				return nil
 			}
 			info, err := d.Info()

@@ -49,6 +49,30 @@ func SkipFile(name string) bool {
 	return strings.HasPrefix(name, ".") || strings.HasPrefix(name, "~$") || strings.HasSuffix(name, ".tmp")
 }
 
+// ValidatePattern checks an exclusion pattern: a file or folder name, with
+// the wildcards of filepath.Match (* ? [..]); no path separators.
+func ValidatePattern(p string) error {
+	if strings.ContainsAny(p, `/\`) {
+		return fmt.Errorf("%q: nur Datei- oder Ordnernamen, keine Pfade", p)
+	}
+	if _, err := filepath.Match(p, ""); err != nil {
+		return fmt.Errorf("%q ist kein gültiges Muster", p)
+	}
+	return nil
+}
+
+// MatchesAny reports whether name matches one of the patterns. Matching
+// ignores letter case, as users expect from file names on macOS and Windows.
+func MatchesAny(name string, patterns []string) bool {
+	n := strings.ToLower(name)
+	for _, p := range patterns {
+		if ok, _ := filepath.Match(strings.ToLower(p), n); ok {
+			return true
+		}
+	}
+	return false
+}
+
 // HashFile returns the SHA-256 of a file's content.
 func HashFile(path string) (string, error) {
 	f, err := os.Open(path)

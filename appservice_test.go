@@ -48,10 +48,10 @@ func TestServiceWithOllama(t *testing.T) {
 		t.Fatalf("fresh status: %+v", st)
 	}
 	rt := s.RuntimeInfo()
-	if !rt.OllamaOK || rt.SuggestedEmbedding == "" {
+	if !rt.Providers[0].OK || rt.SuggestedEmbedding == "" {
 		t.Skipf("ollama not usable: %+v", rt)
 	}
-	if err := s.SaveModels(rt.SuggestedLLM, rt.SuggestedEmbedding); err != nil {
+	if err := s.SaveModels(rt.SuggestedLLM, rt.SuggestedEmbedding, false); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, "core restart", 20*time.Second, func() bool { st := s.Status(); return st.Ready && st.Embedding != "" })

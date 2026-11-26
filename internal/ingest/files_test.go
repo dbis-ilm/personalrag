@@ -46,3 +46,20 @@ func TestSkip(t *testing.T) {
 		t.Error("Supported wrong")
 	}
 }
+
+func TestPatterns(t *testing.T) {
+	pats := []string{"*.tmp", "Archiv", "Entwurf*"}
+	for name, want := range map[string]bool{"x.TMP": true, "archiv": true, "Archiv2": false, "Entwurf_Vertrag.pdf": true, "Vertrag.pdf": false} {
+		if MatchesAny(name, pats) != want {
+			t.Errorf("MatchesAny(%q) = %v", name, !want)
+		}
+	}
+	for _, bad := range []string{"Archiv/2019", `a\\b`, "[x"} {
+		if ValidatePattern(bad) == nil {
+			t.Errorf("ValidatePattern(%q) accepted", bad)
+		}
+	}
+	if ValidatePattern("*.bak") != nil {
+		t.Error("valid pattern refused")
+	}
+}

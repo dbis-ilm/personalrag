@@ -114,7 +114,7 @@ export default function App() {
           <div className="brand-logo"><Icon name="logo" strokeWidth={2} /></div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span className="brand-name">PersonalRAG</span>
-            <span className="brand-sub">{status.searchOnly ? 'Lokal · nur Suche' : `Lokal · ${status.llm}`}</span>
+            <span className="brand-sub" title={status.remote ? `Fragen und Textauszüge gehen an ${status.remote}` : undefined}>{status.remote ? `Extern: ${status.remote}` : status.searchOnly ? 'Lokal · nur Suche' : `Lokal · ${status.llm}`}</span>
           </div>
         </div>
 

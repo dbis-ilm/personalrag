@@ -8,6 +8,7 @@ Desktop-App (Wails v3 + React/TypeScript) für die lokale Suche in eigenen Dokum
 
 - Go ≥ 1.26, Node ≥ 20, Wails-CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` (getestet mit v3.1.0)
 - [Ollama](https://ollama.com) mit einem Embedding-Modell (empfohlen `ollama pull bge-m3`) und optional einem Antwortmodell (z. B. `gemma4:12b`)
+- oder ein OpenAI-kompatibler Server wie GPUStack, LM Studio oder llama.cpp (API-Adresse und Schlüssel in den Einstellungen). Der Schlüssel liegt im System-Schlüsselbund. Liegt der Server nicht auf diesem Rechner, fragt die App vor der ersten Nutzung, ob Textauszüge dorthin gesendet werden dürfen.
 
 ## Starten
 
@@ -29,7 +30,9 @@ Das Protokoll liegt in `<Datenverzeichnis>/logs/personalrag.log` (rotiert bei 5 
 | `internal/store` | `SqliteStore`-Kandidat: SQLite (modernc, CGo-frei) mit FTS5 und sqlite-vec; erfüllt `askyourdocs.VectorStore` |
 | `internal/ingest` | Extraktion (PDF, .docx über askyourdocs; Markdown, Text, HTML) und `IngestSource` je Datei |
 | `internal/indexer` | Ordner-Abgleich (Größe/mtime, Hash bei Änderung), Warteschlange mit Priorität, ein Worker, Genkit-Flow `indexFile` |
-| `internal/rag` | Hybride Suche (Vektor + FTS5, RRF), LLM-Reranking, gestreamte Antwort mit `[n]`-Zitaten; Prompts eingebettet |
+| `internal/rag` | Hybride Suche (Vektor + FTS5, RRF), LLM-Reranking, gestreamte Antwort mit `[n]`-Zitaten; Prompts eingebettet; Ollama- und GPUStack-Abfragen |
+| `connections.go` | Verbindungen, Modellwahl mit Freigabe für entfernte Server, Ausschlussmuster |
+| `internal/secrets` | API-Schlüssel im System-Schlüsselbund (Keychain, Anmeldeinformationsverwaltung) |
 | `internal/config` | Einstellungen, Datenverzeichnis, Kennung der Einzelinstanz |
 | `internal/logging` | Rotierendes Protokoll, Laufzeit-Stufe, Absturzdatei |
 | `internal/migrate` | Versionierte Schema-Migrationen je Komponente |

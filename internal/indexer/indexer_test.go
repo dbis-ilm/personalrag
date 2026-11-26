@@ -135,3 +135,33 @@ func TestPause(t *testing.T) {
 		t.Fatal("not indexed after resume")
 	}
 }
+
+func TestExcludes(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.txt"), "Text A")
+	write(t, filepath.Join(dir, "Archiv", "alt.txt"), "Alter Text")
+	write(t, filepath.Join(dir, "notiz.tmp.txt"), "Temp")
+	st, err := store.Open(filepath.Join(t.TempDir(), "index.db"), testutil.FakeEmbedder{}, "fake", testutil.FakeDim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	coll := store.Collection{ID: "c", Name: "C", Color: "#000", Folders: []string{dir}}
+	st.CreateCollection(ctx, coll)
+	ix := New(genkit.Init(ctx), st, nil, nil)
+	go ix.Run(ctx)
+	ix.ScanCollection(ctx, coll)
+	waitIdle(t, ix)
+	if docs, _ := st.Documents(ctx, "c", ""); len(docs) != 3 {
+		t.Fatalf("before excludes: %d documents", len(docs))
+	}
+	ix.SetExcludes([]string{"archiv", "*.tmp.txt"})
+	ix.ScanCollection(ctx, coll)
+	waitIdle(t, ix)
+	docs, _ := st.Documents(ctx, "c", "")
+	if len(docs) != 1 || filepath.Base(docs[0].Path) != "a.txt" {
+		t.Fatalf("after excludes: %+v", docs)
+	}
+}

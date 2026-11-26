@@ -19,6 +19,16 @@ type Settings struct {
 	EmbeddingDim int    `json:"embeddingDim"`
 	SetupDone    bool   `json:"setupDone"`
 	LogLevel     string `json:"logLevel,omitempty"` // debug | info | warn | error; empty = info
+
+	// GPUStackURL is an OpenAI-compatible API base (GPUStack, LM Studio,
+	// llama.cpp), e.g. https://gpu.example/v1. Its API key lives in the
+	// system keychain, not here.
+	GPUStackURL string `json:"gpustackUrl,omitempty"`
+	// RemoteConsent is the host the user agreed to send document excerpts
+	// to; models on any other non-local host are refused.
+	RemoteConsent string `json:"remoteConsent,omitempty"`
+	// Exclude are file and folder name patterns skipped when indexing.
+	Exclude []string `json:"exclude,omitempty"`
 }
 
 func Defaults() Settings {
