@@ -22,7 +22,7 @@ Beim ersten Start führt ein Assistent durch Runtime-Check, Modellwahl und den e
 
 | Pfad | Inhalt |
 | --- | --- |
-| `main.go` | Fenster, Tray, Datei-Drop, Schließen blendet nur aus |
+| `main.go` | Fenster, Tray, Datei-Drop, Einzelinstanz je Datenverzeichnis, Schließen blendet nur aus |
 | `appservice.go` | API für die UI (Wails-Bindings), Lebenszyklus von Index, Indexer und Engine |
 | `internal/store` | `SqliteStore`-Kandidat: SQLite (modernc, CGo-frei) mit FTS5 und sqlite-vec; erfüllt `askyourdocs.VectorStore` |
 | `internal/ingest` | Extraktion (PDF, .docx über askyourdocs; Markdown, Text, HTML) und `IngestSource` je Datei |

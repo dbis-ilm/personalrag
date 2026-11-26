@@ -8,6 +8,8 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/icons"
+
+	"personalrag/internal/config"
 )
 
 // The built frontend (frontend/dist) is embedded into the binary.
@@ -26,11 +28,30 @@ func init() {
 }
 
 func main() {
-	svc := NewAppService()
+	dataDir, err := config.DataDir()
+	if err != nil {
+		log.Fatalf("Datenverzeichnis: %v", err)
+	}
+	svc := NewAppService(dataDir)
+
+	// One running app per data directory. A second launch hands over to the
+	// first (which comes to the front) and exits, so two processes never
+	// index into the same database.
+	var window *application.WebviewWindow
+	singleInstance := &application.SingleInstanceOptions{
+		UniqueID: config.InstanceID(dataDir),
+		OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+			if window != nil {
+				window.Show()
+				window.Focus()
+			}
+		},
+	}
 
 	app := application.New(application.Options{
-		Name:        "PersonalRAG",
-		Description: "Lokale Dokumentensuche mit belegten Antworten",
+		SingleInstance: singleInstance,
+		Name:           "PersonalRAG",
+		Description:    "Lokale Dokumentensuche mit belegten Antworten",
 		Services: []application.Service{
 			application.NewService(svc),
 		},
@@ -43,7 +64,7 @@ func main() {
 		},
 	})
 
-	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:      "main",
 		Title:     "PersonalRAG",
 		Width:     1280,

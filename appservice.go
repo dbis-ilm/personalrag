@@ -242,18 +242,15 @@ type core struct {
 	hist   *history.Store
 }
 
-func NewAppService() *AppService {
-	return &AppService{searches: map[int64]cachedSearch{}}
+// NewAppService creates the service for one data directory (see
+// config.DataDir); main also derives the single-instance lock from it.
+func NewAppService(dataDir string) *AppService {
+	return &AppService{dataDir: dataDir, searches: map[int64]cachedSearch{}}
 }
 
 func (s *AppService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	s.appCtx = ctx
-	dir, err := config.DataDir()
-	if err != nil {
-		return fmt.Errorf("Datenverzeichnis: %w", err)
-	}
-	s.dataDir = dir
-	st, err := config.Load(dir)
+	st, err := config.Load(s.dataDir)
 	if err != nil {
 		slog.Warn("settings unreadable, using defaults", "err", err)
 	}
