@@ -26,6 +26,7 @@ import (
 	"personalrag/internal/history"
 	"personalrag/internal/indexer"
 	"personalrag/internal/ingest"
+	"personalrag/internal/paths"
 	"personalrag/internal/rag"
 	"personalrag/internal/store"
 )
@@ -567,12 +568,12 @@ func (s *AppService) AddFolderPath(path string) (Collection, error) {
 	if err != nil {
 		return Collection{}, err
 	}
-	path = filepath.Clean(path)
+	path = paths.Canonical(path)
 	if fi, err := os.Stat(path); err != nil || !fi.IsDir() {
 		return Collection{}, fmt.Errorf("%s ist kein Ordner", path)
 	}
-	if id, ok, _ := c.st.CollectionForPath(s.appCtx, path); ok {
-		return Collection{}, fmt.Errorf("Der Ordner gehört bereits zur Sammlung „%s“", s.collectionName(id))
+	if err := s.checkOverlap(c, path); err != nil {
+		return Collection{}, err
 	}
 	colls, _ := c.st.Collections(s.appCtx)
 	name := filepath.Base(path)
@@ -596,16 +597,35 @@ func (s *AppService) AddFolderPath(path string) (Collection, error) {
 	return Collection{ID: cl.ID, Name: cl.Name, Color: cl.Color, Folders: cl.Folders}, nil
 }
 
+// checkOverlap refuses a folder that is, contains or lies inside a watched
+// folder: a file in two collections would switch between them on every scan.
+func (s *AppService) checkOverlap(c *core, path string) error {
+	folders, err := c.st.AllFolders(s.appCtx)
+	if err != nil {
+		return err
+	}
+	for _, f := range folders {
+		switch {
+		case paths.Within(path, f.Path):
+			return fmt.Errorf("Der Ordner gehört bereits zur Sammlung „%s“", s.collectionName(f.CollectionID))
+		case paths.Within(f.Path, path):
+			return fmt.Errorf("Der Ordner enthält %s aus der Sammlung „%s“. Entferne diese Sammlung zuerst oder wähle einen anderen Ordner", displayPath(f.Path), s.collectionName(f.CollectionID))
+		}
+	}
+	return nil
+}
+
 // AddPaths handles files and folders dropped on the window: folders become
 // collections, files inside a watched folder are indexed first.
-func (s *AppService) AddPaths(paths []string) Notice {
+func (s *AppService) AddPaths(dropped []string) Notice {
 	c, err := s.current()
 	if err != nil {
 		return Notice{Text: err.Error(), Kind: "error"}
 	}
 	var added, queued, outside, unsupported int
 	var lastErr error
-	for _, p := range paths {
+	for _, p := range dropped {
+		p = paths.Canonical(p)
 		fi, err := os.Stat(p)
 		if err != nil {
 			continue
@@ -1198,8 +1218,8 @@ func truncate(s string, n int) string {
 }
 
 func displayPath(p string) string {
-	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(p, home) {
-		return "~" + strings.TrimPrefix(p, home)
+	if home, err := os.UserHomeDir(); err == nil && paths.Within(p, home) {
+		return "~" + p[len(filepath.Clean(home)):]
 	}
 	return p
 }

@@ -24,6 +24,8 @@ import (
 	"github.com/dbis-ilm/askyourdocs"
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
+
+	"personalrag/internal/paths"
 )
 
 const schemaVersion = "1"
@@ -519,16 +521,45 @@ func (s *Store) DeleteCollection(ctx context.Context, id string) error {
 	return err
 }
 
-// CollectionForPath returns the collection whose folder contains path.
-func (s *Store) CollectionForPath(ctx context.Context, path string) (string, bool, error) {
-	var id string
-	err := s.db.QueryRowContext(ctx, `SELECT collection_id FROM folders
-		WHERE ? = path OR substr(?, 1, length(path) + 1) = path || '/' OR substr(?, 1, length(path) + 1) = path || '\'
-		ORDER BY length(path) DESC LIMIT 1`, path, path, path).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", false, nil
+// FolderOwner is a watched folder and the collection it belongs to.
+type FolderOwner struct {
+	Path         string
+	CollectionID string
+}
+
+// AllFolders lists every watched folder.
+func (s *Store) AllFolders(ctx context.Context) ([]FolderOwner, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT path, collection_id FROM folders`)
+	if err != nil {
+		return nil, err
 	}
-	return id, err == nil, err
+	defer rows.Close()
+	var out []FolderOwner
+	for rows.Next() {
+		var f FolderOwner
+		if err := rows.Scan(&f.Path, &f.CollectionID); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// CollectionForPath returns the collection whose folder contains path,
+// comparing paths the way the platform does (case-insensitive on Windows).
+// The innermost folder wins.
+func (s *Store) CollectionForPath(ctx context.Context, path string) (string, bool, error) {
+	folders, err := s.AllFolders(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	best, bestLen := "", -1
+	for _, f := range folders {
+		if paths.Within(path, f.Path) && len(f.Path) > bestLen {
+			best, bestLen = f.CollectionID, len(f.Path)
+		}
+	}
+	return best, bestLen >= 0, nil
 }
 
 // ---- Documents ----
