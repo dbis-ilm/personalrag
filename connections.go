@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/dbis-ilm/personalrag/internal/config"
 	"github.com/dbis-ilm/personalrag/internal/i18n"
 	"github.com/dbis-ilm/personalrag/internal/ingest"
-	"github.com/dbis-ilm/personalrag/internal/rag"
 	"github.com/dbis-ilm/personalrag/internal/secrets"
 )
 
@@ -80,10 +80,10 @@ func (consentError) Error() string { return i18n.T("conn.consentRequired") }
 // "" when every configured model runs on this machine.
 func remoteHost(cfg config.Settings) string {
 	usesGPUStack := providerOf(cfg.LLM) == providerGPUStack || providerOf(cfg.Embedding) == providerGPUStack
-	if !usesGPUStack || cfg.GPUStackURL == "" || rag.IsLocal(cfg.GPUStackURL) {
+	if !usesGPUStack || cfg.GPUStackURL == "" || askyourdocs.IsLocalURL(cfg.GPUStackURL) {
 		return ""
 	}
-	return rag.Host(cfg.GPUStackURL)
+	return askyourdocs.URLHost(cfg.GPUStackURL)
 }
 
 // checkConsent fails when excerpts would go to a host the user has not
@@ -123,7 +123,7 @@ func (s *AppService) Connections() ConnectionSettings {
 // TestConnection checks a provider with the given address (and key) without
 // saving. An empty GPUStack key falls back to the stored one.
 func (s *AppService) TestConnection(provider, url, key string) ProviderInfo {
-	base, err := rag.ValidateBaseURL(url)
+	base, err := validateURL(url)
 	if err != nil {
 		return ProviderInfo{ID: provider, Label: providerLabel(provider), URL: url, Configured: true, Error: err.Error()}
 	}
@@ -171,9 +171,41 @@ func (s *AppService) RuntimeInfo() RuntimeInfo {
 	return info
 }
 
+// validateURL checks an entered server address; refusals are worded in the
+// UI language.
+func validateURL(raw string) (string, error) {
+	base, err := askyourdocs.ValidateBaseURL(raw)
+	switch {
+	case errors.Is(err, askyourdocs.ErrCredentialsInURL):
+		return "", i18n.Errorf("conn.credentialsInURL")
+	case err != nil:
+		return "", i18n.Errorf("conn.badURL", strings.TrimSpace(raw))
+	}
+	return base, nil
+}
+
+// serverErrorText words a failed call to a model server in the UI language.
+func serverErrorText(err error) string {
+	var se *askyourdocs.ServerError
+	if !errors.As(err, &se) {
+		return err.Error()
+	}
+	switch se.Kind {
+	case askyourdocs.ErrUnreachable:
+		return i18n.T("conn.unreachable")
+	case askyourdocs.ErrAPIKeyRejected:
+		return i18n.T("conn.keyRejected")
+	case askyourdocs.ErrNotEmbeddingModel:
+		return i18n.T("conn.notEmbedding", se.Model)
+	case askyourdocs.ErrNoEmbedding:
+		return i18n.T("conn.noVector", se.Model)
+	}
+	return i18n.T("conn.serverStatus", se.Status)
+}
+
 func probeOllama(ctx context.Context, base string) ProviderInfo {
-	p := ProviderInfo{ID: providerOllama, Label: "Ollama", URL: base, Configured: true, Remote: !rag.IsLocal(base), Host: rag.Host(base), Models: []ModelInfo{}}
-	models, err := rag.OllamaModels(ctx, base)
+	p := ProviderInfo{ID: providerOllama, Label: "Ollama", URL: base, Configured: true, Remote: !askyourdocs.IsLocalURL(base), Host: askyourdocs.URLHost(base), Models: []ModelInfo{}}
+	models, err := askyourdocs.ListOllamaModels(ctx, base)
 	if err != nil {
 		p.Error = i18n.T("conn.ollamaUnreachable", base)
 		return p
@@ -186,15 +218,15 @@ func probeOllama(ctx context.Context, base string) ProviderInfo {
 }
 
 func probeGPUStack(ctx context.Context, base, key string) ProviderInfo {
-	p := ProviderInfo{ID: providerGPUStack, Label: "GPUStack", URL: base, Configured: true, Remote: !rag.IsLocal(base), Host: rag.Host(base), KeySet: key != "", Models: []ModelInfo{}}
-	names, err := rag.GPUStackModels(ctx, base, key)
+	p := ProviderInfo{ID: providerGPUStack, Label: "GPUStack", URL: base, Configured: true, Remote: !askyourdocs.IsLocalURL(base), Host: askyourdocs.URLHost(base), KeySet: key != "", Models: []ModelInfo{}}
+	names, err := askyourdocs.ListOpenAIModels(ctx, base, key)
 	if err != nil {
-		p.Error = i18n.T("conn.gpustackError", base, err.Error())
+		p.Error = i18n.T("conn.gpustackError", base, serverErrorText(err))
 		return p
 	}
 	p.OK = true
 	for _, n := range names {
-		p.Models = append(p.Models, ModelInfo{Spec: providerGPUStack + "/" + n, Name: n, Embedding: rag.LooksLikeEmbedding(n)})
+		p.Models = append(p.Models, ModelInfo{Spec: providerGPUStack + "/" + n, Name: n, Embedding: askyourdocs.LooksLikeEmbeddingModel(n)})
 	}
 	return p
 }
@@ -218,7 +250,7 @@ func prefer(specs []string, wanted ...string) string {
 // keeps the stored one, removeKey deletes it. An empty GPUStack URL turns
 // GPUStack off.
 func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string, removeKey bool) error {
-	oh, err := rag.ValidateBaseURL(ollamaHost)
+	oh, err := validateURL(ollamaHost)
 	if err != nil {
 		return i18n.Errorf("conn.ollama", err)
 	}
@@ -232,7 +264,7 @@ func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string
 			return i18n.Errorf("conn.gpustackInUse")
 		}
 		removeKey = true
-	} else if gu, err = rag.ValidateBaseURL(gu); err != nil {
+	} else if gu, err = validateURL(gu); err != nil {
 		return i18n.Errorf("conn.gpustack", err)
 	}
 
@@ -293,12 +325,15 @@ func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote boo
 	var err error
 	if providerOf(embeddingSpec) == providerGPUStack {
 		key, _ := secrets.Get(secrets.GPUStackKey)
-		dim, err = rag.GPUStackEmbeddingDim(ctx, cfg.GPUStackURL, key, name)
+		dim, err = askyourdocs.OpenAIEmbeddingDim(ctx, cfg.GPUStackURL, key, name)
 	} else {
-		dim, err = rag.EmbeddingDim(ctx, cfg.OllamaHost, name)
+		dim, err = askyourdocs.OllamaEmbeddingDim(ctx, cfg.OllamaHost, name)
 	}
-	if err != nil {
-		return i18n.Errorf("conn.embeddingFailed", name, err)
+	switch {
+	case errors.Is(err, askyourdocs.ErrNotEmbeddingModel), errors.Is(err, askyourdocs.ErrNoEmbedding):
+		return errors.New(serverErrorText(err))
+	case err != nil:
+		return i18n.Errorf("conn.embeddingFailed", name, serverErrorText(err))
 	}
 	cand.EmbeddingDim = dim
 	if err := s.saveSettings(cand); err != nil {

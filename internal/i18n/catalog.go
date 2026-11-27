@@ -59,15 +59,15 @@ var catalog = map[string]entry{
 	"conn.gpustackMissing":   {"GPUStack ist nicht eingerichtet", "GPUStack is not set up"},
 	"conn.providerUnknown":   {"Der Anbieter von %q wird nicht unterstützt", "The provider of %q is not supported"},
 	"conn.embeddingRequired": {"Ein Embedding-Modell ist erforderlich", "An embedding model is required"},
-	"conn.embeddingFailed":   {"Embedding-Modell %s: %w", "Embedding model %s: %w"},
+	"conn.embeddingFailed":   {"Embedding-Modell %s: %s", "Embedding model %s: %s"},
 	"conn.consentRequired":   {"Bestätigung nötig: Mit diesem Modell werden Textauszüge deiner Dokumente an einen anderen Rechner gesendet", "Confirmation needed: with this model, excerpts of your documents are sent to another machine"},
 	"conn.badURL":            {"%q ist keine gültige Adresse (http:// oder https:// mit Host)", "%q is not a valid address (http:// or https:// with a host)"},
 	"conn.credentialsInURL":  {"Zugangsdaten gehören nicht in die Adresse, bitte das Feld für den API-Schlüssel nutzen", "Credentials do not belong in the address; please use the API key field"},
-	"conn.notEmbedding":      {"%s ist kein Embedding-Modell oder nicht verfügbar: %w", "%s is not an embedding model or not available: %w"},
+	"conn.notEmbedding":      {"%s ist kein Embedding-Modell oder nicht verfügbar", "%s is not an embedding model or not available"},
 	"conn.noVector":          {"%s lieferte keinen Vektor", "%s returned no vector"},
 	"conn.keyRejected":       {"API-Schlüssel abgelehnt", "API key rejected"},
 	"conn.serverStatus":      {"Server antwortet mit %s", "Server answered with %s"},
-	"conn.unreachable":       {"nicht erreichbar: %w", "not reachable: %w"},
+	"conn.unreachable":       {"nicht erreichbar", "not reachable"},
 
 	// Agents view: how each client is set up
 	"client.opencode":      {"In opencode.json im Projekt oder in ~/.config/opencode/opencode.json eintragen.", "Add to opencode.json in the project or to ~/.config/opencode/opencode.json."},

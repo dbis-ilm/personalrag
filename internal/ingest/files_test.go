@@ -3,7 +3,6 @@ package ingest
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/dbis-ilm/askyourdocs"
@@ -26,7 +25,7 @@ func TestExtractMarkdown(t *testing.T) {
 	if len(paras) != 5 {
 		t.Fatalf("got %d paragraphs: %q", len(paras), texts)
 	}
-	if !paras[2].Heading || paras[3].Breadcrumb != "Wohnung › Kündigung" {
+	if !paras[2].Heading || paras[3].Breadcrumb != "Wohnung > Kündigung" {
 		t.Fatalf("heading/breadcrumb wrong: %+v", paras)
 	}
 	if paras[4].Text != "```\n# kein Heading\n```" {
@@ -62,35 +61,5 @@ func TestPatterns(t *testing.T) {
 	}
 	if ValidatePattern("*.bak") != nil {
 		t.Error("valid pattern refused")
-	}
-}
-
-func TestPlainTextAndSplit(t *testing.T) {
-	paras := []askyourdocs.Paragraph{
-		{Text: "Protokoll", PageNum: 1, Heading: true},
-		{Text: "Anwesend: A, B", PageNum: 1},
-		{Text: "Beschluss", PageNum: 2},
-	}
-	got := PlainText(paras)
-	want := "[Page 1]\n\n## Protokoll\n\nAnwesend: A, B\n\n[Page 2]\n\nBeschluss"
-	if got != want {
-		t.Fatalf("PlainText = %q, want %q", got, want)
-	}
-	if PlainText([]askyourdocs.Paragraph{{Text: "x"}, {Text: "y"}}) != "x\n\ny" {
-		t.Error("non-paged text got page markers")
-	}
-
-	text := "aaaa\n\nbbbb\n\ncccc\n\n" + strings.Repeat("d", 25)
-	parts := SplitText(text, 12)
-	for _, p := range parts {
-		if len([]rune(p)) > 12 {
-			t.Errorf("part too long: %q", p)
-		}
-	}
-	if strings.Join(parts, "") != strings.ReplaceAll(text, "\n\n", "") && len(parts) < 4 {
-		t.Errorf("parts = %q", parts)
-	}
-	if parts[0] != "aaaa\n\nbbbb" {
-		t.Errorf("paragraphs not kept together: %q", parts[0])
 	}
 }

@@ -3,7 +3,6 @@
 package ingest
 
 import (
-	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -112,85 +111,21 @@ func Extract(path string) ([]askyourdocs.Paragraph, error) {
 		defer f.Close()
 		return askyourdocs.HTMLToStructuredText(f)
 	case ".md", ".markdown":
-		return extractText(path, true)
+		return extractTextFile(path, true)
 	case ".txt":
-		return extractText(path, false)
+		return extractTextFile(path, false)
 	}
 	return nil, fmt.Errorf("unsupported format: %s", filepath.Ext(path))
 }
 
-// extractText splits plain text or Markdown into paragraphs at blank lines.
-// Markdown ATX headings become heading paragraphs and a breadcrumb.
-func extractText(path string, markdown bool) ([]askyourdocs.Paragraph, error) {
+// extractTextFile reads a Markdown or plain-text file into paragraphs.
+func extractTextFile(path string, markdown bool) ([]askyourdocs.Paragraph, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-
-	var (
-		paras    []askyourdocs.Paragraph
-		buf      []string
-		headings []string // index = level-1
-		inFence  bool
-	)
-	crumb := func() string {
-		var parts []string
-		for _, h := range headings {
-			if h != "" {
-				parts = append(parts, h)
-			}
-		}
-		return strings.Join(parts, " › ")
-	}
-	flush := func() {
-		text := strings.TrimSpace(strings.Join(buf, "\n"))
-		buf = buf[:0]
-		if text != "" {
-			paras = append(paras, askyourdocs.Paragraph{Text: text, PageNum: 0, Breadcrumb: crumb()})
-		}
-	}
-
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := strings.TrimRight(sc.Text(), " \t\r")
-		trimmed := strings.TrimSpace(line)
-		if markdown && strings.HasPrefix(trimmed, "```") {
-			inFence = !inFence
-			buf = append(buf, line)
-			continue
-		}
-		if markdown && !inFence {
-			if level, title, ok := atxHeading(trimmed); ok {
-				flush()
-				for len(headings) < level {
-					headings = append(headings, "")
-				}
-				headings = append(headings[:level-1], title)
-				paras = append(paras, askyourdocs.Paragraph{Text: title, PageNum: 0, Heading: true, Breadcrumb: crumb()})
-				continue
-			}
-		}
-		if trimmed == "" && !inFence {
-			flush()
-			continue
-		}
-		buf = append(buf, line)
-	}
-	flush()
-	return paras, sc.Err()
-}
-
-func atxHeading(line string) (int, string, bool) {
-	level := 0
-	for level < len(line) && line[level] == '#' {
-		level++
-	}
-	if level == 0 || level > 6 || level >= len(line) || line[level] != ' ' {
-		return 0, "", false
-	}
-	return level, strings.TrimSpace(strings.TrimRight(line[level:], "# ")), true
+	return askyourdocs.ExtractTextParagraphs(f, markdown)
 }
 
 // FileSource is the askyourdocs.IngestSource for one local file whose
@@ -231,64 +166,4 @@ func (s *FileSource) Documents(chunks []askyourdocs.Chunk) []*ai.Document {
 
 func (s *FileSource) DeleteStale(ctx context.Context, vs askyourdocs.VectorStore) (int, error) {
 	return vs.DeleteByURL(ctx, s.Path)
-}
-
-// PlainText renders paragraphs as readable text for an agent: paragraphs
-// separated by blank lines, headings as Markdown headings, and a "[Page n]"
-// marker wherever the page changes (paged formats only).
-func PlainText(paras []askyourdocs.Paragraph) string {
-	var b strings.Builder
-	page := 0
-	for _, p := range paras {
-		text := strings.TrimSpace(p.Text)
-		if text == "" {
-			continue
-		}
-		if p.PageNum > 0 && p.PageNum != page {
-			page = p.PageNum
-			if b.Len() > 0 {
-				b.WriteString("\n\n")
-			}
-			fmt.Fprintf(&b, "[Page %d]", page)
-		}
-		if b.Len() > 0 {
-			b.WriteString("\n\n")
-		}
-		if p.Heading {
-			b.WriteString("## ")
-		}
-		b.WriteString(text)
-	}
-	return b.String()
-}
-
-// SplitText cuts text into parts of at most max runes, at paragraph
-// boundaries where possible, so each part can go to a model on its own.
-func SplitText(text string, max int) []string {
-	var parts []string
-	var cur strings.Builder
-	curLen := 0
-	flush := func() {
-		if s := strings.TrimSpace(cur.String()); s != "" {
-			parts = append(parts, s)
-		}
-		cur.Reset()
-		curLen = 0
-	}
-	for _, para := range strings.Split(text, "\n\n") {
-		n := len([]rune(para)) + 2
-		if curLen > 0 && curLen+n > max {
-			flush()
-		}
-		// A single paragraph longer than max is cut hard.
-		for r := []rune(para); len(r) > max; r = []rune(para) {
-			parts = append(parts, string(r[:max]))
-			para = string(r[max:])
-		}
-		cur.WriteString(para)
-		cur.WriteString("\n\n")
-		curLen += len([]rune(para)) + 2
-	}
-	flush()
-	return parts
 }

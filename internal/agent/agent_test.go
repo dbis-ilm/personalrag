@@ -339,23 +339,3 @@ func TestExtractPagesStopAndCache(t *testing.T) {
 		t.Fatal("cache survived re-indexing")
 	}
 }
-
-func TestParsePages(t *testing.T) {
-	sel, err := parsePages("1, 3-4,7-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for p, want := range map[int]bool{1: true, 2: false, 3: true, 4: true, 5: false, 7: true, 99: true} {
-		if sel(p) != want {
-			t.Errorf("page %d: %v", p, !want)
-		}
-	}
-	for _, bad := range []string{"0", "4-2", "a", "1-x", "-3"} {
-		if _, err := parsePages(bad); err == nil {
-			t.Errorf("parsePages(%q) accepted", bad)
-		}
-	}
-	if sel, _ := parsePages(""); sel != nil {
-		t.Error("empty pages should select everything")
-	}
-}

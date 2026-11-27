@@ -30,7 +30,7 @@ func TestOllamaEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	dim, err := EmbeddingDim(ctx, host, embName)
+	dim, err := askyourdocs.OllamaEmbeddingDim(ctx, host, embName)
 	if err != nil {
 		t.Skipf("ollama not usable: %v", err)
 	}

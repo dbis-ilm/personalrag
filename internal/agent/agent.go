@@ -19,7 +19,6 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -347,7 +346,7 @@ type ReadDocumentOut struct {
 // documentText extracts a document's current text from its file, limited
 // to pages when given. note explains when pages could not be applied.
 func documentText(d store.Document, pages string) (text, note string, err error) {
-	sel, err := parsePages(pages)
+	sel, err := askyourdocs.ParsePages(pages)
 	if err != nil {
 		return "", "", err
 	}
@@ -376,42 +375,7 @@ func documentText(d store.Document, pages string) (text, note string, err error)
 			paras = keep
 		}
 	}
-	return askyourdocs.SanitizeUntrusted(ingest.PlainText(paras)), note, nil
-}
-
-// parsePages reads "1", "1-3", "3-" and comma lists; nil means all pages.
-func parsePages(s string) (func(int) bool, error) {
-	s = strings.ReplaceAll(strings.TrimSpace(s), " ", "")
-	if s == "" {
-		return nil, nil
-	}
-	type span struct{ from, to int } // to 0 = open end
-	var spans []span
-	bad := fmt.Errorf("pages %q: expected e.g. 1, 1-3, 3- or 1,5-7", s)
-	for _, f := range strings.Split(s, ",") {
-		a, b, isRange := strings.Cut(f, "-")
-		from, err := strconv.Atoi(a)
-		if err != nil || from < 1 {
-			return nil, bad
-		}
-		to := from
-		if isRange {
-			if b == "" {
-				to = 0
-			} else if to, err = strconv.Atoi(b); err != nil || to < from {
-				return nil, bad
-			}
-		}
-		spans = append(spans, span{from, to})
-	}
-	return func(p int) bool {
-		for _, sp := range spans {
-			if p >= sp.from && (sp.to == 0 || p <= sp.to) {
-				return true
-			}
-		}
-		return false
-	}, nil
+	return askyourdocs.SanitizeUntrusted(askyourdocs.PlainText(paras)), note, nil
 }
 
 func (s *Server) readDocument(ctx context.Context, in ReadDocumentIn) (ReadDocumentOut, outcome, error) {
@@ -583,7 +547,7 @@ func (s *Server) extract(ctx context.Context, in ExtractIn) (ExtractOut, outcome
 	if err != nil {
 		return ExtractOut{}, outcome{}, err
 	}
-	parts := ingest.SplitText(text, extractPartChars)
+	parts := askyourdocs.SplitText(text, extractPartChars)
 	name := filepath.Base(d.Path)
 	label := ""
 	if in.Pages != "" && note == "" {
