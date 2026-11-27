@@ -13,7 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"personalrag/internal/migrate"
+	"github.com/dbis-ilm/personalrag/internal/migrate"
 )
 
 // ErrNotFound is returned for unknown conversations or turns.

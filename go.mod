@@ -1,4 +1,4 @@
-module personalrag
+module github.com/dbis-ilm/personalrag
 
 go 1.26.0
 

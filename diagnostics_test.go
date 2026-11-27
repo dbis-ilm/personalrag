@@ -11,8 +11,8 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"personalrag/internal/config"
-	"personalrag/internal/logging"
+	"github.com/dbis-ilm/personalrag/internal/config"
+	"github.com/dbis-ilm/personalrag/internal/logging"
 )
 
 // TestDiagnostics runs offline: logging in a temp data dir, a crash left by

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 380" width="540" height="380">
+  <!-- DMG window background (540 x 380, the window size in darwin/Taskfile.yml). -->
+  <rect width="540" height="380" fill="#F4F5F8"/>
+  <rect y="330" width="540" height="50" fill="#E9ECF3"/>
+  <text x="270" y="361" text-anchor="middle" font-family="-apple-system, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="14" fill="#3A4150">PersonalRAG in den Ordner „Programme“ ziehen</text>
+</svg>

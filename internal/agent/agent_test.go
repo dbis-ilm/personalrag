@@ -15,10 +15,10 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"personalrag/internal/indexer"
-	"personalrag/internal/rag"
-	"personalrag/internal/store"
-	"personalrag/internal/testutil"
+	"github.com/dbis-ilm/personalrag/internal/indexer"
+	"github.com/dbis-ilm/personalrag/internal/rag"
+	"github.com/dbis-ilm/personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/testutil"
 )
 
 // fakeModel answers the extract prompt with the names after "Anwesend:" in

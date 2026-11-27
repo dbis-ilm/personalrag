@@ -23,17 +23,17 @@ import (
 
 	"github.com/dbis-ilm/askyourdocs"
 
-	"personalrag/internal/agent"
-	"personalrag/internal/config"
-	"personalrag/internal/history"
-	"personalrag/internal/indexer"
-	"personalrag/internal/ingest"
-	"personalrag/internal/logging"
-	"personalrag/internal/migrate"
-	"personalrag/internal/paths"
-	"personalrag/internal/rag"
-	"personalrag/internal/secrets"
-	"personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/agent"
+	"github.com/dbis-ilm/personalrag/internal/config"
+	"github.com/dbis-ilm/personalrag/internal/history"
+	"github.com/dbis-ilm/personalrag/internal/indexer"
+	"github.com/dbis-ilm/personalrag/internal/ingest"
+	"github.com/dbis-ilm/personalrag/internal/logging"
+	"github.com/dbis-ilm/personalrag/internal/migrate"
+	"github.com/dbis-ilm/personalrag/internal/paths"
+	"github.com/dbis-ilm/personalrag/internal/rag"
+	"github.com/dbis-ilm/personalrag/internal/secrets"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 // Event names emitted to the frontend.

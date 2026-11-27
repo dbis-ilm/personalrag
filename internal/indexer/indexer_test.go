@@ -10,8 +10,8 @@ import (
 
 	"github.com/firebase/genkit/go/genkit"
 
-	"personalrag/internal/store"
-	"personalrag/internal/testutil"
+	"github.com/dbis-ilm/personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/testutil"
 )
 
 func write(t *testing.T, path, text string) {

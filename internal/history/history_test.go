@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 func TestConversationLifecycle(t *testing.T) {

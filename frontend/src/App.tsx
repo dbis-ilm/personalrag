@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Events } from '@wailsio/runtime'
-import { AppService, AppStatus, Collection, ConversationSummary, IndexProgress } from '../bindings/personalrag'
+import { AppService, AppStatus, Collection, ConversationSummary, IndexProgress } from '../bindings/github.com/dbis-ilm/personalrag'
 import Icon from './components/Icon'
 import Toasts, { toast } from './components/Toasts'
 import AskView from './views/AskView'

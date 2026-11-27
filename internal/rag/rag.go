@@ -18,7 +18,7 @@ import (
 
 	"github.com/dbis-ilm/askyourdocs"
 
-	"personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 // PromptFS holds the .prompt files; pass it to genkit.Init with

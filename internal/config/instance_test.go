@@ -19,7 +19,7 @@ func TestInstanceID(t *testing.T) {
 	}
 
 	idA := InstanceID(a)
-	if !regexp.MustCompile(`^app\.personalrag\.[0-9a-f]{12}$`).MatchString(idA) {
+	if !regexp.MustCompile(`^dbis\.kus\.personalrag\.[0-9a-f]{12}$`).MatchString(idA) {
 		t.Fatalf("unexpected format %q", idA)
 	}
 	if InstanceID(a) != idA || InstanceID(a+string(filepath.Separator)) != idA {

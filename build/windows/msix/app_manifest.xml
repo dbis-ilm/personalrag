@@ -8,7 +8,7 @@
   IgnorableNamespaces="uap3">
   
   <Identity 
-    Name="app.personalrag"
+    Name="dbis.kus.personalrag"
     Publisher="CN=PersonalRAG"
     Version="0.1.0.0"
     ProcessorArchitecture="arm64" />
@@ -29,7 +29,7 @@
   </Resources>
   
   <Applications>
-    <Application Id="app.personalrag" Executable="personalrag" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="dbis.kus.personalrag" Executable="PersonalRAG" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="PersonalRAG"
         Description="Lokale Dokumentensuche mit belegten Antworten"
@@ -41,7 +41,7 @@
       </uap:VisualElements>
       
       <Extensions>
-        <desktop:Extension Category="windows.fullTrustProcess" Executable="personalrag" />
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="PersonalRAG" />
         
         
       </Extensions>

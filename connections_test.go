@@ -12,8 +12,8 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"personalrag/internal/config"
-	"personalrag/internal/secrets"
+	"github.com/dbis-ilm/personalrag/internal/config"
+	"github.com/dbis-ilm/personalrag/internal/secrets"
 )
 
 // fakeGPUStack is an OpenAI-compatible server on 127.0.0.1 with a chat and

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"personalrag/internal/history"
-	"personalrag/internal/migrate"
-	"personalrag/internal/store"
-	"personalrag/internal/testutil"
+	"github.com/dbis-ilm/personalrag/internal/history"
+	"github.com/dbis-ilm/personalrag/internal/migrate"
+	"github.com/dbis-ilm/personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/testutil"
 )
 
 // TestUpgradeFromPrototype opens a database written by the first commit

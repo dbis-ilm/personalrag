@@ -26,5 +26,5 @@ func InstanceID(dataDir string) string {
 		p = strings.ToLower(p)
 	}
 	sum := sha256.Sum256([]byte(p))
-	return "app.personalrag." + hex.EncodeToString(sum[:6])
+	return "dbis.kus.personalrag." + hex.EncodeToString(sum[:6])
 }

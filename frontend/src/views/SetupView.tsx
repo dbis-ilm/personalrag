@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AppService, AppStatus, Collection, ModelInfo, ProviderInfo, RuntimeInfo } from '../../bindings/personalrag'
+import { AppService, AppStatus, Collection, ModelInfo, ProviderInfo, RuntimeInfo } from '../../bindings/github.com/dbis-ilm/personalrag'
 import Icon from '../components/Icon'
 import { toast } from '../components/Toasts'
 import { errorText } from '../App'

@@ -7,7 +7,7 @@ version: '3'
 info:
   companyName: "PersonalRAG" # The name of the company
   productName: "PersonalRAG" # The name of the application
-  productIdentifier: "app.personalrag" # The unique product identifier
+  productIdentifier: "dbis.kus.personalrag" # The unique product identifier
   description: "Lokale Dokumentensuche mit belegten Antworten" # The application description
   copyright: "© 2026" # Copyright text
   comments: "Lokale Dokumentensuche mit belegten Antworten" # Comments

@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"personalrag/internal/secrets"
+	"github.com/dbis-ilm/personalrag/internal/secrets"
 )
 
 // TestMain keeps every test away from the real system keychain.

@@ -16,8 +16,8 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"personalrag/internal/config"
-	"personalrag/internal/logging"
+	"github.com/dbis-ilm/personalrag/internal/config"
+	"github.com/dbis-ilm/personalrag/internal/logging"
 )
 
 // version is set at release time with -ldflags "-X main.version=…".

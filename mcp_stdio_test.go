@@ -16,8 +16,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"personalrag/internal/agent"
-	"personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/agent"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 // TestMCPOverStdio builds the binary, prepares a data directory with the

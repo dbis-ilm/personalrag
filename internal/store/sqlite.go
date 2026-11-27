@@ -25,8 +25,8 @@ import (
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
-	"personalrag/internal/migrate"
-	"personalrag/internal/paths"
+	"github.com/dbis-ilm/personalrag/internal/migrate"
+	"github.com/dbis-ilm/personalrag/internal/paths"
 )
 
 // Metadata keys a chunk document carries into Index.

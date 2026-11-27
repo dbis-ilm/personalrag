@@ -17,7 +17,7 @@ import (
 
 	"github.com/dbis-ilm/askyourdocs"
 
-	"personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 // MaxFileSize skips files above this size.

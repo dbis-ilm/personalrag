@@ -8,7 +8,7 @@
         AllowPromptForPassword="false">
     </Settings>
     <Installer
-        Path="personalrag"
+        Path="PersonalRAG"
         Arguments=""
         InstallLocation="C:\Program Files\PersonalRAG\PersonalRAG">
     </Installer>
@@ -25,10 +25,10 @@
         </Capabilities>
         <Applications>
             <Application
-                Id="app.personalrag"
+                Id="dbis.kus.personalrag"
                 Description="Lokale Dokumentensuche mit belegten Antworten"
                 DisplayName="PersonalRAG"
-                ExecutableName="personalrag"
+                ExecutableName="PersonalRAG"
                 EntryPoint="Windows.FullTrustApplication">
                 
             </Application>
@@ -47,7 +47,7 @@
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
-    <SaveLocation PackagePath="personalrag.msix" />
+    <SaveLocation PackagePath="PersonalRAG.msix" />
     <PackageIntegrity>
         <CertificatePath></CertificatePath>
     </PackageIntegrity>

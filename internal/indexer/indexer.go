@@ -18,8 +18,8 @@ import (
 	"github.com/firebase/genkit/go/core"
 	"github.com/firebase/genkit/go/genkit"
 
-	"personalrag/internal/ingest"
-	"personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/ingest"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 const (

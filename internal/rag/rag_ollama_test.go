@@ -13,8 +13,8 @@ import (
 
 	"github.com/dbis-ilm/askyourdocs"
 
-	"personalrag/internal/indexer"
-	"personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/indexer"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 // TestOllamaEndToEnd indexes two small documents with a real embedding model

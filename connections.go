@@ -10,10 +10,10 @@ import (
 
 	"github.com/dbis-ilm/askyourdocs"
 
-	"personalrag/internal/config"
-	"personalrag/internal/ingest"
-	"personalrag/internal/rag"
-	"personalrag/internal/secrets"
+	"github.com/dbis-ilm/personalrag/internal/config"
+	"github.com/dbis-ilm/personalrag/internal/ingest"
+	"github.com/dbis-ilm/personalrag/internal/rag"
+	"github.com/dbis-ilm/personalrag/internal/secrets"
 )
 
 // Model providers: Ollama on this machine, and an OpenAI-compatible server

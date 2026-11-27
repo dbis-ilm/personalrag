@@ -26,10 +26,10 @@ import (
 	"github.com/dbis-ilm/askyourdocs"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"personalrag/internal/ingest"
-	"personalrag/internal/paths"
-	"personalrag/internal/rag"
-	"personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/ingest"
+	"github.com/dbis-ilm/personalrag/internal/paths"
+	"github.com/dbis-ilm/personalrag/internal/rag"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 const (

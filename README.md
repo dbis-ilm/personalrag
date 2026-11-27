@@ -1,5 +1,7 @@
 # PersonalRAG
 
+[![CI](https://github.com/dbis-ilm/personalrag/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dbis-ilm/personalrag/actions/workflows/ci.yml)
+
 PersonalRAG is a desktop app for macOS and Windows that answers questions about your own documents and shows where each answer comes from. It indexes local folders, keeps the index up to date, and answers with citations that open the exact passage. By default everything runs on your machine with [Ollama](https://ollama.com); your documents only leave it if you explicitly choose a model on another server.
 
 It is built with [Wails v3](https://v3.wails.io) (Go backend, React/TypeScript UI) on top of the [askyourdocs](https://github.com/dbis-ilm/askyourdocs) RAG library.
@@ -43,6 +45,7 @@ To build:
 ## Build and run
 
 ```sh
+git clone https://github.com/dbis-ilm/personalrag.git && cd personalrag
 wails3 dev       # development mode with hot reload
 wails3 build     # native binary in bin/PersonalRAG (bin\PersonalRAG.exe on Windows)
 wails3 package   # macOS: bin/PersonalRAG.app with icon
@@ -176,4 +179,4 @@ To change the icon, edit the SVGs in `build/icon-src`, render `build/appicon.png
 
 ## License
 
-Apache License 2.0.
+Copyright 2026 Kai-Uwe Sattler. Licensed under the [Apache License, Version 2.0](LICENSE); see also [NOTICE](NOTICE).

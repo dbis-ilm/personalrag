@@ -15,14 +15,14 @@ func TestWithinRules(t *testing.T) {
 		sep        byte
 		fold, want bool
 	}{
-		{`/Users/kai/Docs/a.pdf`, `/Users/kai/Docs`, '/', false, true},
-		{`/Users/kai/Docs`, `/Users/kai/Docs`, '/', false, true},
-		{`/Users/kai/Docs2/a.pdf`, `/Users/kai/Docs`, '/', false, false}, // sibling with common prefix
-		{`/Users/kai/docs/a.pdf`, `/Users/kai/Docs`, '/', false, false},  // case matters on macOS
+		{`/Users/anna/Docs/a.pdf`, `/Users/anna/Docs`, '/', false, true},
+		{`/Users/anna/Docs`, `/Users/anna/Docs`, '/', false, true},
+		{`/Users/anna/Docs2/a.pdf`, `/Users/anna/Docs`, '/', false, false}, // sibling with common prefix
+		{`/Users/anna/docs/a.pdf`, `/Users/anna/Docs`, '/', false, false},  // case matters on macOS
 		{`/a`, `/`, '/', false, true},
-		{`C:\Users\kai\Dokumente\a.pdf`, `C:\Users\kai\Dokumente`, '\\', true, true},
-		{`c:\users\KAI\dokumente\a.pdf`, `C:\Users\kai\Dokumente`, '\\', true, true}, // case-insensitive on Windows
-		{`C:\Users\kai\Dokumente2\a.pdf`, `C:\Users\kai\Dokumente`, '\\', true, false},
+		{`C:\Users\anna\Dokumente\a.pdf`, `C:\Users\anna\Dokumente`, '\\', true, true},
+		{`c:\users\ANNA\dokumente\a.pdf`, `C:\Users\anna\Dokumente`, '\\', true, true}, // case-insensitive on Windows
+		{`C:\Users\anna\Dokumente2\a.pdf`, `C:\Users\anna\Dokumente`, '\\', true, false},
 		{`D:\a.pdf`, `D:\`, '\\', true, true},
 	}
 	for _, c := range cases {

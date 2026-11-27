@@ -62,7 +62,7 @@ func within(child, dir string, sep byte, fold bool) bool {
 }
 
 // trueCase rebuilds p from the directory entries on disk, component by
-// component, so "c:\users\KAI\dokumente" becomes "C:\Users\kai\Dokumente".
+// component, so "c:\users\ANNA\dokumente" becomes "C:\Users\anna\Dokumente".
 // Components that cannot be read are kept as given.
 func trueCase(p string) string {
 	vol := filepath.VolumeName(p)

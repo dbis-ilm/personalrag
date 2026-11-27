@@ -1,6 +1,6 @@
 import { Fragment, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
-import { AppService, Source, Turn } from '../../bindings/personalrag'
+import { AppService, Source, Turn } from '../../bindings/github.com/dbis-ilm/personalrag'
 import Icon from '../components/Icon'
 import { toast } from '../components/Toasts'
 import { errorText } from '../App'

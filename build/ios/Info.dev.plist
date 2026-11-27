@@ -9,7 +9,7 @@
 		<key>CFBundleGetInfoString</key>
 		<string>Lokale Dokumentensuche mit belegten Antworten</string>
 		<key>CFBundleIdentifier</key>
-		<string>app.personalrag.dev</string>
+		<string>dbis.kus.personalrag.dev</string>
 		<key>CFBundleName</key>
 		<string>PersonalRAG (Dev)</string>
 		<key>CFBundlePackageType</key>

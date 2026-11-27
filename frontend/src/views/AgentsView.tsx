@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AppService, AccessLogEntry, ClientConfig, Collection, MCPStatus } from '../../bindings/personalrag'
+import { AppService, AccessLogEntry, ClientConfig, Collection, MCPStatus } from '../../bindings/github.com/dbis-ilm/personalrag'
 import { toast } from '../components/Toasts'
 import { errorText } from '../App'
 

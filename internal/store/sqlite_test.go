@@ -9,7 +9,7 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 
-	"personalrag/internal/testutil"
+	"github.com/dbis-ilm/personalrag/internal/testutil"
 )
 
 func openTest(t *testing.T) (*Store, string) {
