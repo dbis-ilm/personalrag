@@ -177,6 +177,10 @@ To change the icon, edit the SVGs in `build/icon-src`, render `build/appicon.png
 3. **MCP for agents:** stdio server with read-only tools, per-collection sharing and access log are done; next: Streamable HTTP for the running app with token and origin checks.
 4. **Distribution:** signed and notarised macOS package, Windows installer, update notice, autostart, quick-ask window.
 
+## Security
+
+Please report vulnerabilities privately, not as public issues; see [SECURITY.md](SECURITY.md).
+
 ## License
 
 Copyright 2026 Kai-Uwe Sattler. Licensed under the [Apache License, Version 2.0](LICENSE); see also [NOTICE](NOTICE).
