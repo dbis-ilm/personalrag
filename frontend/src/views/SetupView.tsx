@@ -22,6 +22,7 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
   const [checking, setChecking] = useState(false)
   const [llm, setLlm] = useState('')
   const [emb, setEmb] = useState('')
+  const [agent, setAgent] = useState<string | null>(null) // null until loaded
   const [consent, setConsent] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -32,6 +33,7 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
       setRt(info)
       setEmb((e) => e || info.embedding || info.suggestedEmbedding)
       setLlm((l) => l || (status.setupDone ? info.llm : info.llm || info.suggestedLlm))
+      setAgent((a) => (a === null ? info.agentModel : a))
     } finally {
       setChecking(false)
     }
@@ -46,18 +48,26 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
   const gpu = providers.find((p) => p.id === 'gpustack')
   const anyOK = providers.some((p) => p.ok)
   const embChanged = !!rt?.embedding && emb !== rt.embedding
-  const modelsDirty = !!rt && (emb !== rt.embedding || llm !== rt.llm)
-  const usesRemote = !!gpu?.remote && [llm, emb].some((spec) => spec.startsWith('gpustack/'))
+  const coreDirty = !!rt && (emb !== rt.embedding || llm !== rt.llm)
+  const agentDirty = !!rt && agent !== null && agent !== rt.agentModel
+  const modelsDirty = coreDirty || agentDirty
+  const agentSpec = agent ?? ''
+  const usesRemote = !!gpu?.remote && [llm, emb, agentSpec].some((spec) => spec.startsWith('gpustack/'))
   const needsConsent = usesRemote && rt?.remoteConsent !== gpu?.host
 
-  useEffect(() => { setConsent(false) }, [llm, emb])
+  useEffect(() => { setConsent(false) }, [llm, emb, agent])
 
   const saveModels = async (): Promise<boolean> => {
     setSaving(true)
     try {
-      await AppService.SaveModels(llm, emb, consent)
+      // Answer and embedding model restart the core (and may rebuild the
+      // index); the agent model is only a setting.
+      if (coreDirty || !rt?.embedding || (needsConsent && !agentDirty)) {
+        await AppService.SaveModels(llm, emb, consent)
+      }
+      if (agentDirty) await AppService.SaveAgentModel(agentSpec, consent)
       toast(embChanged ? t('setup.savedRebuild') : t('setup.saved'), 'ok')
-      setRt((r) => (r ? { ...r, llm, embedding: emb, remoteConsent: usesRemote && gpu ? gpu.host : r.remoteConsent } : r))
+      setRt((r) => (r ? { ...r, llm, embedding: emb, agentModel: agentSpec, remoteConsent: usesRemote && gpu ? gpu.host : r.remoteConsent } : r))
       return true
     } catch (e) {
       toast(errorText(e), 'error')
@@ -96,6 +106,21 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
           ))}
         </select>
       </div>
+      {mode === 'settings' && (
+        <div className="field">
+          <label htmlFor="agent">{t('setup.agentLabel')}</label>
+          <select id="agent" className="input select" value={agentSpec} onChange={(e) => setAgent(e.target.value)} disabled={!anyOK}>
+            <option value="">{t('setup.agentSameAsAnswer')}</option>
+            {providers.filter((p) => p.ok).map((p) => (
+              <ModelOptions key={p.id} provider={p} models={(p.models ?? []).filter((m) => !m.embedding)} needTools />
+            ))}
+          </select>
+          <span className="muted" style={{ fontSize: 12 }}>
+            {t('setup.agentHint')}
+            {rt?.suggestedAgent && agentSpec !== rt.suggestedAgent && <> {t('setup.agentSuggested', { model: rt.suggestedAgent.replace(/^[a-z]+\//, '') })}</>}
+          </span>
+        </div>
+      )}
       {usesRemote && gpu && (needsConsent ? (
         <div className="consent">
           <Icon name="alert" size={16} strokeWidth={2.2} />
@@ -253,12 +278,18 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
   )
 }
 
-function ModelOptions({ provider, models }: { provider: ProviderInfo; models: ModelInfo[] }) {
+// ModelOptions lists a provider's models; with needTools, models that
+// cannot call tools are shown but disabled.
+function ModelOptions({ provider, models, needTools }: { provider: ProviderInfo; models: ModelInfo[]; needTools?: boolean }) {
   if (models.length === 0) return null
   const where = provider.remote ? t('model.remote', { host: provider.host }) : t('model.local')
   return (
     <optgroup label={`${provider.label} (${where})`}>
-      {models.map((m) => <option key={m.spec} value={m.spec}>{m.name}{m.size ? ` · ${m.size}` : ''}</option>)}
+      {models.map((m) => (
+        <option key={m.spec} value={m.spec} disabled={needTools && !m.tools}>
+          {m.name}{m.size ? ` · ${m.size}` : ''}{needTools && !m.tools ? ` · ${t('model.noTools')}` : ''}
+        </option>
+      ))}
     </optgroup>
   )
 }

@@ -211,6 +211,11 @@ export const en: Record<keyof typeof de, string> = {
   'setup.formats': 'PDF, Word, Markdown, text and HTML · files are never changed',
   'model.remote': 'remote: {host}',
   'model.local': 'local',
+  'model.noTools': 'cannot call tools',
+  'setup.agentLabel': 'Agent model',
+  'setup.agentSameAsAnswer': 'Same as answer model',
+  'setup.agentHint': 'For the agent mode: plans several steps over many documents and calls tools. Needs a large model with tool calling.',
+  'setup.agentSuggested': 'Recommended: {model}.',
 
   'settings.remote': 'Some models run on {host}.',
   'settings.local': 'Everything runs locally.',

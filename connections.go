@@ -44,6 +44,7 @@ type ModelInfo struct {
 	Name      string `json:"name"`
 	Size      string `json:"size"`
 	Embedding bool   `json:"embedding"` // known or guessed embedding model
+	Tools     bool   `json:"tools"`     // can call tools (agent mode); assumed for OpenAI-compatible servers
 }
 
 type RuntimeInfo struct {
@@ -52,6 +53,8 @@ type RuntimeInfo struct {
 	Embedding          string         `json:"embedding"` // configured spec
 	SuggestedLLM       string         `json:"suggestedLlm"`
 	SuggestedEmbedding string         `json:"suggestedEmbedding"`
+	AgentModel         string         `json:"agentModel"` // configured spec; "" = the answer model
+	SuggestedAgent     string         `json:"suggestedAgent"`
 	RemoteConsent      string         `json:"remoteConsent"` // host the user agreed to send excerpts to
 }
 
@@ -78,8 +81,19 @@ func (consentError) Error() string { return i18n.T("conn.consentRequired") }
 
 // remoteHost returns the host that receives document excerpts under cfg, or
 // "" when every configured model runs on this machine.
+// usesProvider reports whether any configured model (answer, embedding,
+// agent) runs on provider.
+func usesProvider(cfg config.Settings, provider string) bool {
+	for _, spec := range []string{cfg.LLM, cfg.Embedding, cfg.AgentModel} {
+		if providerOf(spec) == provider {
+			return true
+		}
+	}
+	return false
+}
+
 func remoteHost(cfg config.Settings) string {
-	usesGPUStack := providerOf(cfg.LLM) == providerGPUStack || providerOf(cfg.Embedding) == providerGPUStack
+	usesGPUStack := usesProvider(cfg, providerGPUStack)
 	if !usesGPUStack || cfg.GPUStackURL == "" || askyourdocs.IsLocalURL(cfg.GPUStackURL) {
 		return ""
 	}
@@ -150,7 +164,7 @@ func (s *AppService) RuntimeInfo() RuntimeInfo {
 	ctx, cancel := context.WithTimeout(s.appCtx, 8*time.Second)
 	defer cancel()
 
-	info := RuntimeInfo{LLM: cfg.LLM, Embedding: cfg.Embedding, RemoteConsent: cfg.RemoteConsent}
+	info := RuntimeInfo{LLM: cfg.LLM, Embedding: cfg.Embedding, AgentModel: cfg.AgentModel, RemoteConsent: cfg.RemoteConsent}
 	ollama := ProviderInfo{ID: providerOllama, Label: "Ollama", Models: []ModelInfo{}}
 	if !cfg.OllamaOff {
 		ollama = probeOllama(ctx, cfg.OllamaHost)
@@ -175,6 +189,18 @@ func (s *AppService) RuntimeInfo() RuntimeInfo {
 	}
 	info.SuggestedEmbedding = prefer(embs, "ollama/bge-m3", "ollama/nomic-embed-text", "ollama/mxbai-embed-large")
 	info.SuggestedLLM = prefer(llms, "ollama/gemma4:12b", "ollama/qwen3:8b", "ollama/gemma3:12b", "ollama/llama3.1:8b")
+	// Agent suggestion from the spike (three tasks, see internal/agent):
+	// glm-5.2 solved all fast, qwen3.6:27b all but slowly, gemma4:12b failed
+	// counting over many documents. Only models that can call tools.
+	var agents []string
+	for _, p := range info.Providers {
+		for _, m := range p.Models {
+			if m.Tools && !m.Embedding {
+				agents = append(agents, m.Spec)
+			}
+		}
+	}
+	info.SuggestedAgent = prefer(agents, "gpustack/glm-5.2", "gpustack/glm-5", "ollama/qwen3.6:27b", "gpustack/qwen3.8:27b", "ollama/qwen3:32b")
 	return info
 }
 
@@ -219,7 +245,7 @@ func probeOllama(ctx context.Context, base string) ProviderInfo {
 	}
 	p.OK = true
 	for _, m := range models {
-		p.Models = append(p.Models, ModelInfo{Spec: providerOllama + "/" + m.Name, Name: m.Name, Size: fmt.Sprintf("%.1f GB", float64(m.Size)/1e9), Embedding: m.Embedding})
+		p.Models = append(p.Models, ModelInfo{Spec: providerOllama + "/" + m.Name, Name: m.Name, Size: fmt.Sprintf("%.1f GB", float64(m.Size)/1e9), Embedding: m.Embedding, Tools: m.Tools})
 	}
 	return p
 }
@@ -233,7 +259,7 @@ func probeGPUStack(ctx context.Context, base, key string) ProviderInfo {
 	}
 	p.OK = true
 	for _, n := range names {
-		p.Models = append(p.Models, ModelInfo{Spec: providerGPUStack + "/" + n, Name: n, Embedding: askyourdocs.LooksLikeEmbeddingModel(n)})
+		p.Models = append(p.Models, ModelInfo{Spec: providerGPUStack + "/" + n, Name: n, Embedding: askyourdocs.LooksLikeEmbeddingModel(n), Tools: !askyourdocs.LooksLikeEmbeddingModel(n)})
 	}
 	return p
 }
@@ -264,7 +290,7 @@ func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string
 	ollamaOff := strings.TrimSpace(ollamaHost) == ""
 	oh := cfg.OllamaHost // kept while Ollama is off
 	if ollamaOff {
-		if providerOf(cfg.LLM) == providerOllama || providerOf(cfg.Embedding) == providerOllama {
+		if usesProvider(cfg, providerOllama) {
 			return i18n.Errorf("conn.ollamaInUse")
 		}
 	} else {
@@ -277,7 +303,7 @@ func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string
 
 	gu := strings.TrimSpace(gpustackURL)
 	if gu == "" {
-		if providerOf(cfg.LLM) == providerGPUStack || providerOf(cfg.Embedding) == providerGPUStack {
+		if usesProvider(cfg, providerGPUStack) {
 			return i18n.Errorf("conn.gpustackInUse")
 		}
 		removeKey = true
@@ -319,18 +345,8 @@ func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote boo
 	cfg := s.settings
 	s.mu.RUnlock()
 	for _, spec := range []string{llmSpec, embeddingSpec} {
-		switch providerOf(spec) {
-		case "":
-		case providerOllama:
-			if cfg.OllamaOff {
-				return i18n.Errorf("conn.ollamaOff")
-			}
-		case providerGPUStack:
-			if cfg.GPUStackURL == "" {
-				return i18n.Errorf("conn.gpustackMissing")
-			}
-		default:
-			return i18n.Errorf("conn.providerUnknown", spec)
+		if err := checkProvider(cfg, spec); err != nil {
+			return err
 		}
 	}
 	cand := cfg
@@ -365,6 +381,58 @@ func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote boo
 	}
 	s.restartAsync()
 	return nil
+}
+
+// checkProvider refuses a model spec whose provider is unknown or not set up.
+func checkProvider(cfg config.Settings, spec string) error {
+	switch providerOf(spec) {
+	case "":
+	case providerOllama:
+		if cfg.OllamaOff {
+			return i18n.Errorf("conn.ollamaOff")
+		}
+	case providerGPUStack:
+		if cfg.GPUStackURL == "" {
+			return i18n.Errorf("conn.gpustackMissing")
+		}
+	default:
+		return i18n.Errorf("conn.providerUnknown", spec)
+	}
+	return nil
+}
+
+// SaveAgentModel sets the model for the agent mode; "" uses the answer
+// model. An Ollama model must report tool calling; OpenAI-compatible
+// servers do not say, so their models are accepted. A model on another
+// machine needs confirmRemote once per host, as in SaveModels.
+func (s *AppService) SaveAgentModel(spec string, confirmRemote bool) error {
+	s.mu.RLock()
+	cfg := s.settings
+	s.mu.RUnlock()
+	if err := checkProvider(cfg, spec); err != nil {
+		return err
+	}
+	if providerOf(spec) == providerOllama {
+		ctx, cancel := context.WithTimeout(s.appCtx, 10*time.Second)
+		defer cancel()
+		_, name := askyourdocs.ParseModelSpec(spec)
+		caps, err := askyourdocs.OllamaCapabilities(ctx, cfg.OllamaHost, name)
+		if err != nil {
+			return i18n.Errorf("conn.modelCheckFailed", name, serverErrorText(err))
+		}
+		if !slices.Contains(caps, "tools") {
+			return i18n.Errorf("conn.noTools", name)
+		}
+	}
+	cand := cfg
+	cand.AgentModel = spec
+	if h := remoteHost(cand); h != "" && cand.RemoteConsent != h {
+		if !confirmRemote {
+			return errRemoteConsent
+		}
+		cand.RemoteConsent = h
+	}
+	return s.saveSettings(cand)
 }
 
 func builtinExclusions() []string {
