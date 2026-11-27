@@ -71,6 +71,7 @@ export const en: Record<keyof typeof de, string> = {
   'ask.askFollowup': 'Ask a follow-up',
   'ask.ask': 'Ask a question',
   'ask.sendHint': '↵ to send',
+  'ask.historyHint': '↑ earlier questions',
   'ask.send': 'Send question',
   'ask.preview': 'Source preview',
   'ask.source': 'Source',

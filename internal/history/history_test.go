@@ -77,3 +77,41 @@ func TestConversationLifecycle(t *testing.T) {
 		t.Fatalf("turns not deleted with conversation: %v", err)
 	}
 }
+
+func TestRecentQuestions(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "index.db"), nil, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	s, err := New(st.DB(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created := map[string]bool{}
+	for _, c := range []struct{ conv, q string }{
+		{"a", "Wie lange ist die Kündigungsfrist?"},
+		{"a", "Und für den Vermieter?"},
+		{"b", "Wer war anwesend?"},
+		{"b", "Wie lange ist die Kündigungsfrist?"}, // asked again: moves to the front
+	} {
+		if !created[c.conv] {
+			if _, err := s.Create(ctx, c.conv, c.q, ""); err != nil {
+				t.Fatal(err)
+			}
+			created[c.conv] = true
+		}
+		if _, err := s.AddTurn(ctx, Turn{ConversationID: c.conv, Question: c.q, Mode: "search", Done: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := s.RecentQuestions(ctx, 10)
+	want := []string{"Wie lange ist die Kündigungsfrist?", "Wer war anwesend?", "Und für den Vermieter?"}
+	if err != nil || strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("RecentQuestions = %q, %v; want %q", got, err, want)
+	}
+	if got, _ := s.RecentQuestions(ctx, 2); len(got) != 2 {
+		t.Fatalf("limit ignored: %q", got)
+	}
+}

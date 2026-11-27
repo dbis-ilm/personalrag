@@ -71,6 +71,7 @@ export const de = {
   'ask.askFollowup': 'Folgefrage stellen',
   'ask.ask': 'Frage stellen',
   'ask.sendHint': '↵ senden',
+  'ask.historyHint': '↑ frühere Fragen',
   'ask.send': 'Frage senden',
   'ask.preview': 'Quellenvorschau',
   'ask.source': 'Quelle',

@@ -992,6 +992,16 @@ func (s *AppService) Ask(turnID int64) error {
 	return nil
 }
 
+// RecentQuestions lists the questions asked before, newest first and each
+// once, for paging through them in the question field.
+func (s *AppService) RecentQuestions() ([]string, error) {
+	c, err := s.current()
+	if err != nil {
+		return nil, err
+	}
+	return c.hist.RecentQuestions(s.appCtx, 200)
+}
+
 // Conversations lists the most recent conversations.
 func (s *AppService) Conversations() ([]ConversationSummary, error) {
 	c, err := s.current()
