@@ -52,16 +52,16 @@ jobs:
         run: npm run build
 
       - name: Go vet
-        run: go vet $(go list ./... | grep -v /build/)
+        run: go vet ./...
 
       # The race detector needs cgo, which the macOS runner has out of the box.
       - name: Go tests (race)
         if: runner.os == 'macOS'
-        run: go test -race $(go list ./... | grep -v /build/)
+        run: go test -race ./...
 
       - name: Go tests
         if: runner.os != 'macOS'
-        run: go test $(go list ./... | grep -v /build/)
+        run: go test ./...
 
       - name: Build app
         run: wails3 build
