@@ -26,7 +26,7 @@ Planned next: a file system watcher, OCR, MCP over HTTP for the running app, sig
 
 To run:
 
-- macOS on Apple Silicon (developed and tested on macOS 27), Windows 10/11 (x64, untested so far), or Ubuntu 24.04 with GNOME (experimental)
+- macOS 13 Ventura or later on Apple Silicon (developed and tested on macOS 27), Windows 10/11 (x64, untested so far), or Ubuntu 24.04 with GNOME (experimental)
 - **Either** [Ollama](https://ollama.com) with an embedding model and, optionally, a chat model:
 
   ```sh

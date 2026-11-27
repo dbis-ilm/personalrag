@@ -17,3 +17,4 @@ Thumbs.db
 
 # Test fixtures are databases on purpose
 !testdata/*.db
+/personalrag
