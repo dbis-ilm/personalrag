@@ -10,6 +10,7 @@ import (
 
 	"github.com/firebase/genkit/go/genkit"
 
+	"github.com/dbis-ilm/personalrag/internal/ocr"
 	"github.com/dbis-ilm/personalrag/internal/store"
 	"github.com/dbis-ilm/personalrag/internal/testutil"
 )
@@ -24,10 +25,15 @@ func write(t *testing.T, path, text string) {
 	}
 }
 
-// waitIdle runs until the queue is empty or the deadline passes.
+// waitIdle runs until the queue is empty or 10 s have passed.
 func waitIdle(t *testing.T, ix *Indexer) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
+	waitIdleFor(t, ix, 10*time.Second)
+}
+
+func waitIdleFor(t *testing.T, ix *Indexer, within time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(within)
 	for time.Now().Before(deadline) {
 		if p := ix.Progress(); !p.Active {
 			return
@@ -267,5 +273,71 @@ func TestWatchKeepsIndexCurrent(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("Watch did not return after cancel")
+	}
+}
+
+// TestScannedPDF: with text recognition a scanned PDF becomes searchable
+// (plan item 2.5); without it, it stays "needs OCR". A document marked
+// "needs OCR" earlier is read on the next scan once recognition exists.
+func TestScannedPDF(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dir := t.TempDir()
+	root := filepath.Join(dir, "Scans")
+	scan, err := os.ReadFile("../ocr/testdata/scan.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "protokoll.pdf"), string(scan))
+	write(t, filepath.Join(root, "alt.pdf"), string(scan))
+
+	st, err := store.Open(filepath.Join(dir, "index.db"), testutil.FakeEmbedder{}, "fake", testutil.FakeDim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	coll := store.Collection{ID: "s", Name: "Scans", Color: "#000", Folders: []string{root}}
+	if err := st.CreateCollection(ctx, coll); err != nil {
+		t.Fatal(err)
+	}
+	// alt.pdf was marked "needs OCR" by an earlier version.
+	info, _ := os.Stat(filepath.Join(root, "alt.pdf"))
+	id, err := st.UpsertDocument(ctx, store.Document{Path: filepath.Join(root, "alt.pdf"), CollectionID: "s", Size: info.Size(), ModTime: info.ModTime().Unix(), Format: "PDF", Status: store.StatusOCR})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetDocumentState(ctx, id, store.StatusOCR, NoteNeedsOCR, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	ix := New(genkit.Init(ctx), st, nil, nil)
+	go ix.Run(ctx)
+	if err := ix.ScanCollection(ctx, coll); err != nil {
+		t.Fatal(err)
+	}
+	// Vision's first request in a new binary takes about 25 s (it prepares
+	// its models once per executable); every page after that ~0.1 s.
+	waitIdleFor(t, ix, 90*time.Second)
+
+	docs, _ := st.Documents(ctx, "s", "")
+	if len(docs) != 2 {
+		t.Fatalf("want 2 documents, got %+v", docs)
+	}
+	if !ocr.Available() {
+		for _, d := range docs {
+			if d.Status != store.StatusOCR || d.Note != NoteNeedsOCR {
+				t.Errorf("%s: want needs OCR, got %s %q", d.Path, d.Status, d.Note)
+			}
+		}
+		return
+	}
+	for _, d := range docs {
+		if d.Status != store.StatusOK || d.Note != NoteOCRRead || d.Chunks == 0 {
+			t.Errorf("%s: not indexed from OCR: %+v", d.Path, d)
+		}
+	}
+	hits, err := st.KeywordSearch(ctx, "Kündigungsfrist", 5, "s", store.GermanStopWords)
+	if err != nil || len(hits) == 0 || !strings.HasPrefix(hits[0].Pages, "1") { // the small fixture's pages share a chunk: "1-2"
+		t.Fatalf("recognised text not searchable with its page: %+v, %v", hits, err)
 	}
 }

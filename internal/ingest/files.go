@@ -18,6 +18,7 @@ import (
 	"github.com/dbis-ilm/askyourdocs"
 
 	"github.com/dbis-ilm/personalrag/internal/i18n"
+	"github.com/dbis-ilm/personalrag/internal/ocr"
 	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
@@ -88,34 +89,50 @@ func HashFile(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// ErrNeedsOCR marks a PDF without a text layer.
+// ErrNeedsOCR marks a PDF without a text layer on a system without text
+// recognition.
 var ErrNeedsOCR = errors.New("no text layer (scanned document)")
 
-// Extract returns a file's paragraphs. Scanned PDFs return ErrNeedsOCR.
-func Extract(path string) ([]askyourdocs.Paragraph, error) {
+// Extract returns a file's paragraphs. A scanned PDF is read with text
+// recognition where the system has it (ocred is then true); elsewhere it
+// returns ErrNeedsOCR.
+func Extract(ctx context.Context, path string) (paras []askyourdocs.Paragraph, ocred bool, err error) {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".pdf", ".docx":
 		paras, err := askyourdocs.ExtractParagraphs(path)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		if strings.EqualFold(filepath.Ext(path), ".pdf") && !askyourdocs.HasTextLayer(paras) {
-			return nil, ErrNeedsOCR
+		if !strings.EqualFold(filepath.Ext(path), ".pdf") || askyourdocs.HasTextLayer(paras) {
+			return paras, false, nil
 		}
-		return paras, nil
+		if !ocr.Available() {
+			return nil, false, ErrNeedsOCR
+		}
+		paras, err = ocr.PDF(ctx, path)
+		if err != nil {
+			return nil, false, err
+		}
+		if !askyourdocs.HasTextLayer(paras) {
+			return nil, false, ErrNeedsOCR // nothing legible on the pages either
+		}
+		return paras, true, nil
 	case ".html", ".htm":
 		f, err := os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		defer f.Close()
-		return askyourdocs.HTMLToStructuredText(f)
+		paras, err := askyourdocs.HTMLToStructuredText(f)
+		return paras, false, err
 	case ".md", ".markdown":
-		return extractTextFile(path, true)
+		paras, err := extractTextFile(path, true)
+		return paras, false, err
 	case ".txt":
-		return extractTextFile(path, false)
+		paras, err := extractTextFile(path, false)
+		return paras, false, err
 	}
-	return nil, fmt.Errorf("unsupported format: %s", filepath.Ext(path))
+	return nil, false, fmt.Errorf("unsupported format: %s", filepath.Ext(path))
 }
 
 // extractTextFile reads a Markdown or plain-text file into paragraphs.

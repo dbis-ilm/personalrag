@@ -32,6 +32,7 @@ import (
 	"github.com/dbis-ilm/personalrag/internal/ingest"
 	"github.com/dbis-ilm/personalrag/internal/logging"
 	"github.com/dbis-ilm/personalrag/internal/migrate"
+	"github.com/dbis-ilm/personalrag/internal/ocr"
 	"github.com/dbis-ilm/personalrag/internal/paths"
 	"github.com/dbis-ilm/personalrag/internal/rag"
 	"github.com/dbis-ilm/personalrag/internal/secrets"
@@ -323,6 +324,14 @@ func (s *AppService) ServiceStartup(ctx context.Context, _ application.ServiceOp
 			s.lastCrash, s.crashText = when.Format(time.RFC3339), text
 			slog.Warn("previous run crashed", "at", when)
 		}
+	}
+	ocr.SetCacheDir(filepath.Join(s.dataDir, "ocr-cache"))
+	if !s.agentMode {
+		go func() {
+			if n := ocr.PruneCache(90 * 24 * time.Hour); n > 0 {
+				slog.Info("ocr cache pruned", "entries", n)
+			}
+		}()
 	}
 	st, err := config.Load(s.dataDir)
 	if s.agentMode {
@@ -1487,6 +1496,7 @@ func (s *AppService) Diagnostics() string {
 	}
 	cancel()
 	line("Ollama: %s, %s", cfg.OllamaHost, ollama)
+	line("Text recognition (OCR): %v", ocr.Available())
 	line("Status: ready=%v, setup done=%v", st.Ready, st.SetupDone)
 	if st.Error != "" {
 		line("Error: %s", st.Error)
