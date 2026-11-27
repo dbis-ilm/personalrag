@@ -3,6 +3,7 @@ import { Events } from '@wailsio/runtime'
 import { AppService, AppStatus, Collection, ConversationSummary, IndexProgress } from '../bindings/github.com/dbis-ilm/personalrag'
 import Icon from './components/Icon'
 import Toasts, { toast } from './components/Toasts'
+import AboutDialog from './components/AboutDialog'
 import AskView from './views/AskView'
 import SourcesView from './views/SourcesView'
 import AgentsView from './views/AgentsView'
@@ -31,6 +32,7 @@ export default function App() {
   const [conversationId, setConversationId] = useState('')
   const [scope, setScope] = useState<string>('')
   const [progress, setProgress] = useState<IndexProgress | null>(null)
+  const [aboutOpen, setAboutOpen] = useState(false)
 
   const reloadCollections = useCallback(() => {
     AppService.Collections().then((v) => setCollections(v ?? [])).catch(() => setCollections([]))
@@ -53,6 +55,7 @@ export default function App() {
       Events.On('index:progress', (ev) => setProgress(ev.data)),
       Events.On('sources:changed', () => reloadCollections()),
       Events.On('notice', (ev) => toast(ev.data.text, ev.data.kind)),
+      Events.On('about:show', () => setAboutOpen(true)),
     ]
     return () => offs.forEach((off) => off())
   }, [reloadCollections, reloadHistory])
@@ -102,6 +105,7 @@ export default function App() {
       <div className="app">
         <div className="content setup-shell" key={status.language}><SetupView mode="wizard" status={status} onAddFolder={addFolder} collections={collections} /></div>
         <Toasts />
+        <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       </div>
     )
   }
@@ -216,10 +220,11 @@ export default function App() {
         {view === 'agents' && <AgentsView collections={collections} onChanged={reloadCollections} />}
         {view === 'settings' && (
           <SetupView mode="settings" status={status} onAddFolder={addFolder} collections={collections}
-            onHistoryCleared={() => { setConversationId(''); reloadHistory() }} />
+            onHistoryCleared={() => { setConversationId(''); reloadHistory() }} onAbout={() => setAboutOpen(true)} />
         )}
       </div>
       <Toasts />
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   )
 }

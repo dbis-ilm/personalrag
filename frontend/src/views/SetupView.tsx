@@ -8,12 +8,13 @@ import { Key, fmtDateTime, t } from '../i18n'
 const STEPS: Key[] = ['setup.step1', 'setup.step2', 'setup.step3']
 
 // Setup wizard on first start; the same building blocks as the settings page.
-export default function SetupView({ mode, status, collections, onAddFolder, onHistoryCleared }: {
+export default function SetupView({ mode, status, collections, onAddFolder, onHistoryCleared, onAbout }: {
   mode: 'wizard' | 'settings'
   status: AppStatus
   collections: Collection[]
   onAddFolder: () => void
   onHistoryCleared?: () => void
+  onAbout?: () => void
 }) {
   const [confirmClear, setConfirmClear] = useState(false)
   const [step, setStep] = useState(0)
@@ -181,6 +182,7 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
             </div>
           </section>
           <DiagnosticsCard lastCrash={status.lastCrash} />
+          {onAbout && <div><button type="button" className="btn" onClick={onAbout}>{t('about.open')}</button></div>}
         </div>
       </div>
     )

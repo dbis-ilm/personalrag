@@ -45,7 +45,14 @@ const (
 	EventSourcesChanged = "sources:changed"
 	EventStatusChanged  = "status:changed"
 	EventNotice         = "notice"
+	EventShowAbout      = "about:show"
 )
+
+// ShowAbout asks the window to open the About box (from the app or tray menu).
+type ShowAbout struct{}
+
+// repository is the project's public home, linked from the About box.
+const repository = "https://github.com/dbis-ilm/personalrag"
 
 const rescanInterval = 15 * time.Minute
 
@@ -1179,7 +1186,7 @@ func (s *AppService) Diagnostics() string {
 	cfg, st := s.settings, s.status
 	s.mu.RUnlock()
 
-	line("PersonalRAG %s", version)
+	line("PersonalRAG %s (%s), askyourdocs %s", version, firstNonEmpty(buildCommit(), "dev"), depVersion("github.com/dbis-ilm/askyourdocs"))
 	line("System: %s/%s, %s, Wails %s", runtime.GOOS, runtime.GOARCH, runtime.Version(), wailsVersion())
 	line("Data directory: %s", displayPath(s.dataDir))
 	line("Log level: %s, language: %s", s.LogLevel(), i18n.Current())
@@ -1251,15 +1258,96 @@ func redactHome(text string) string {
 	return strings.ReplaceAll(text, home, "~")
 }
 
-func wailsVersion() string {
+func wailsVersion() string { return depVersion("github.com/wailsapp/wails/v3") }
+
+// depVersion is the version of a module compiled into this binary.
+// Pseudo-versions shrink to their commit ("v0.0.0-2026…-7c13302417b9" →
+// "7c13302").
+func depVersion(path string) string {
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, d := range bi.Deps {
-			if d.Path == "github.com/wailsapp/wails/v3" {
-				return d.Version
+			if d.Path == path {
+				v := d.Version
+				if d.Replace != nil {
+					v = d.Replace.Version
+				}
+				if i := strings.LastIndexByte(v, '-'); i > 0 && strings.Count(v, "-") >= 2 && len(v)-i-1 == 12 {
+					return v[i+1 : i+8]
+				}
+				return v
 			}
 		}
 	}
 	return "unknown"
+}
+
+// buildCommit is the commit the binary was built from: set by the build
+// (-ldflags "-X main.commit=…"), else the VCS stamp of a plain go build.
+func buildCommit() string {
+	if commit != "" {
+		return commit
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		rev, dirty := "", false
+		for _, s := range bi.Settings {
+			switch s.Key {
+			case "vcs.revision":
+				rev = s.Value
+			case "vcs.modified":
+				dirty = s.Value == "true"
+			}
+		}
+		if len(rev) > 7 {
+			rev = rev[:7]
+		}
+		if rev != "" && dirty {
+			rev += "+"
+		}
+		return rev
+	}
+	return ""
+}
+
+// AboutInfo is what the About box shows.
+type AboutInfo struct {
+	Version     string `json:"version"`
+	Commit      string `json:"commit"` // "" for a development build
+	AskYourDocs string `json:"askyourdocs"`
+	Wails       string `json:"wails"`
+	Go          string `json:"go"`
+	OS          string `json:"os"`   // darwin | windows | linux
+	Arch        string `json:"arch"` // arm64 | amd64
+	LLM         string `json:"llm"`  // "" = search only
+	Embedding   string `json:"embedding"`
+	Remote      string `json:"remote"` // host receiving excerpts, "" = all local
+	DataDir     string `json:"dataDir"`
+	Repository  string `json:"repository"`
+}
+
+func (s *AppService) About() AboutInfo {
+	s.mu.RLock()
+	cfg := s.settings
+	s.mu.RUnlock()
+	return AboutInfo{
+		Version: version, Commit: buildCommit(),
+		AskYourDocs: depVersion("github.com/dbis-ilm/askyourdocs"), Wails: wailsVersion(), Go: runtime.Version(),
+		OS: runtime.GOOS, Arch: runtime.GOARCH,
+		LLM: cfg.LLM, Embedding: cfg.Embedding, Remote: remoteHost(cfg),
+		DataDir: displayPath(s.dataDir), Repository: repository,
+	}
+}
+
+// OpenRepository opens the project page (or a page below it, e.g.
+// "blob/main/LICENSE") in the default browser.
+func (s *AppService) OpenRepository(page string) error {
+	u := repository
+	if page = strings.Trim(page, "/"); page != "" {
+		if strings.Contains(page, "..") || strings.ContainsAny(page, "?#:") {
+			return fmt.Errorf("invalid page %q", page)
+		}
+		u += "/" + page
+	}
+	return application.Get().Browser.OpenURL(u)
 }
 
 // ---- Agents (MCP) ----

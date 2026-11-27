@@ -24,6 +24,9 @@ import (
 // version is set at release time with -ldflags "-X main.version=…".
 var version = "0.1.0-dev"
 
+// commit is set by the build: -ldflags "-X main.commit=<short hash>".
+var commit = ""
+
 // The built frontend (frontend/dist) is embedded into the binary.
 //
 //go:embed all:frontend/dist
@@ -49,6 +52,7 @@ func init() {
 	application.RegisterEvent[SourcesChanged](EventSourcesChanged)
 	application.RegisterEvent[AppStatus](EventStatusChanged)
 	application.RegisterEvent[Notice](EventNotice)
+	application.RegisterEvent[ShowAbout](EventShowAbout)
 }
 
 func main() {
@@ -162,6 +166,32 @@ func main() {
 	}
 	tray.SetTooltip("PersonalRAG")
 
+	showAbout := func() {
+		showWindow()
+		app.Event.Emit(EventShowAbout, ShowAbout{})
+	}
+
+	// macOS: our own About box instead of the bare system panel; the rest
+	// of the app menu keeps its standard items.
+	var aboutItem *application.MenuItem
+	var appMenu *application.Menu
+	if runtime.GOOS == "darwin" {
+		appMenu = app.NewMenu()
+		m := appMenu.AddSubmenu("PersonalRAG")
+		aboutItem = m.Add(i18n.T("menu.about")).OnClick(func(*application.Context) { showAbout() })
+		m.AddSeparator()
+		m.AddRole(application.ServicesMenu)
+		m.AddSeparator()
+		m.AddRole(application.Hide)
+		m.AddRole(application.HideOthers)
+		m.AddRole(application.ShowAll)
+		m.AddSeparator()
+		m.AddRole(application.Quit)
+		appMenu.AddRole(application.EditMenu)
+		appMenu.AddRole(application.WindowMenu)
+		app.Menu.Set(appMenu)
+	}
+
 	menu := app.NewMenu()
 	openItem := menu.Add(i18n.T("tray.open")).OnClick(func(*application.Context) { showWindow() })
 	menu.AddSeparator()
@@ -169,13 +199,19 @@ func main() {
 		svc.SetIndexPaused(ctx.ClickedMenuItem().Checked())
 	})
 	menu.AddSeparator()
+	trayAboutItem := menu.Add(i18n.T("menu.about")).OnClick(func(*application.Context) { showAbout() })
 	quitItem := menu.Add(i18n.T("tray.quit")).OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
 	svc.onLanguageChange(func() {
 		openItem.SetLabel(i18n.T("tray.open"))
 		pauseItem.SetLabel(i18n.T("tray.pause"))
 		quitItem.SetLabel(i18n.T("tray.quit"))
+		trayAboutItem.SetLabel(i18n.T("menu.about"))
 		menu.Update()
+		if aboutItem != nil {
+			aboutItem.SetLabel(i18n.T("menu.about"))
+			app.Menu.Set(appMenu) // re-apply the app menu
+		}
 	})
 
 	if err := app.Run(); err != nil {

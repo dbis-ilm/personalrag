@@ -9,6 +9,7 @@ var catalog = map[string]entry{
 	"tray.open":        {"PersonalRAG öffnen", "Open PersonalRAG"},
 	"tray.pause":       {"Indexierung pausieren", "Pause indexing"},
 	"tray.quit":        {"Beenden", "Quit"},
+	"menu.about":       {"Über PersonalRAG", "About PersonalRAG"},
 	"dialog.addFolder": {"Ordner indexieren", "Index a folder"},
 	"dialog.add":       {"Hinzufügen", "Add"},
 
