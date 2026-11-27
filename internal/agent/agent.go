@@ -63,6 +63,7 @@ type Server struct {
 	st      *store.Store
 	eng     *rag.Engine
 	version string
+	all     bool // in-app agent: every collection, not only shared ones
 }
 
 func New(st *store.Store, eng *rag.Engine, version string) *Server {
@@ -163,7 +164,7 @@ func (s *Server) shared(ctx context.Context) (map[string]store.Collection, error
 	}
 	out := map[string]store.Collection{}
 	for _, c := range colls {
-		if c.SharedWithAgents {
+		if c.SharedWithAgents || s.all {
 			out[c.ID] = c
 		}
 	}

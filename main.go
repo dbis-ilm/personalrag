@@ -54,6 +54,7 @@ func init() {
 	application.RegisterEvent[Notice](EventNotice)
 	application.RegisterEvent[ShowAbout](EventShowAbout)
 	application.RegisterEvent[AnswerSources](EventAnswerSources)
+	application.RegisterEvent[AgentStep](EventAgentStep)
 }
 
 func main() {

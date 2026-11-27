@@ -432,7 +432,11 @@ func (s *AppService) SaveAgentModel(spec string, confirmRemote bool) error {
 		}
 		cand.RemoteConsent = h
 	}
-	return s.saveSettings(cand)
+	if err := s.saveSettings(cand); err != nil {
+		return err
+	}
+	s.restartAsync() // the core registers the agent model
+	return nil
 }
 
 func builtinExclusions() []string {

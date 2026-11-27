@@ -79,6 +79,12 @@ var catalog = map[string]entry{
 	"conn.serverStatus":      {"Server antwortet mit %s", "Server answered with %s"},
 	"conn.unreachable":       {"nicht erreichbar", "not reachable"},
 
+	// Agent mode
+	"agent.unavailable": {"Kein Modell für den Agenten-Modus eingerichtet (Einstellungen › Modelle)", "No model set up for the agent mode (Settings › Models)"},
+	"agent.done":        {"%d Schritte · %s · %s", "%d steps · %s · %s"},
+	"agent.stopped":     {"Abgebrochen", "Stopped"},
+	"agent.timeout":     {"Nach %d Minuten abgebrochen", "Stopped after %d minutes"},
+
 	// Sharing
 	"share.mailTruncated": {"Für die E-Mail gekürzt. Vollständig über „Kopieren“ oder „Als Datei speichern“.", "Shortened for e-mail. Use “Copy” or “Save as file” for the full text."},
 
