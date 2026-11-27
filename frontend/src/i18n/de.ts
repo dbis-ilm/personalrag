@@ -97,6 +97,7 @@ export const de = {
   'note.ocr': 'Keine Textebene erkannt',
   'note.embedding-unreachable': 'Embedding-Modell nicht erreichbar',
   'note.no-text': 'Kein Text gefunden',
+  'note.ocr-read': 'Per Texterkennung gelesen',
   'note.encrypted': 'Datei ist passwortgeschützt',
   'note.corrupt': 'Datei ist beschädigt oder hat ein ungültiges Format',
   'folder.current': 'Aktuell',

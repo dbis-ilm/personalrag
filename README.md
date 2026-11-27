@@ -11,7 +11,7 @@ It is built with [Wails v3](https://v3.wails.io) (Go backend, React/TypeScript U
 ## Features
 
 - **Folders as collections.** Add a folder (dialog or drag and drop) and it becomes a collection. A file system watcher (FSEvents on macOS, fsnotify on Windows and Linux) picks up new, changed and deleted files within a few seconds; a full scan on start, every 15 minutes and on demand catches anything it missed. Unchanged files are skipped by size, modification time and content hash.
-- **Formats:** PDF, Word (.docx), Markdown, plain text and HTML. Scanned PDFs without a text layer are flagged as needing OCR instead of being indexed empty.
+- **Formats:** PDF, Word (.docx), Markdown, plain text and HTML. Scanned PDFs without a text layer are read with the system's text recognition on macOS (Apple Vision, German and English, offline); the result is cached per file content, so agents reading the document reuse it. The first recognition after installing or updating the app takes about 25 s while macOS prepares Vision for the new binary, then about 0.1 s per page. On Windows and Linux such scans are flagged as needing OCR instead of being indexed empty, for now.
 - **Hybrid search:** vector search (sqlite-vec) and full-text search (SQLite FTS5) merged with Reciprocal Rank Fusion. Search works without an answer model.
 - **Cited answers:** the top passages are reranked by the model, the answer streams in with `[n]` citations, and each citation opens its source passage. A confidence rating says how well the sources matched.
 - **Conversations:** follow-up questions are rewritten into standalone questions before searching. Conversations are stored locally with a snapshot of the cited passages, so they reopen exactly as answered.
@@ -20,7 +20,7 @@ It is built with [Wails v3](https://v3.wails.io) (Go backend, React/TypeScript U
 - **English and German:** the UI follows the system language and can be switched in Settings. Answers come in the language of the question, whatever language the documents are in. Texts for agents (MCP) are always English.
 - **Desktop behaviour:** runs in the menu bar / notification area, closing the window keeps indexing, one instance per data directory, light and dark mode.
 
-Planned next: OCR, MCP over HTTP for the running app, signed installers. See [Roadmap](#roadmap).
+Planned next: OCR on Windows, MCP over HTTP for the running app, signed installers. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -195,7 +195,7 @@ To change the icon, edit the SVGs in `build/icon-src`, render `build/appicon.png
 ## Roadmap
 
 1. **Foundation and Windows:** run and test on Windows hardware; CI on both platforms.
-2. **Index and answer quality:** ~~file system watcher~~ (done), cloud placeholders (iCloud, OneDrive), evaluation on a real corpus, OCR, more formats (.eml, .pptx, .xlsx), filters by file type and date.
+2. **Index and answer quality:** ~~file system watcher~~ (done), cloud placeholders (iCloud, OneDrive), evaluation on a real corpus, OCR (~~macOS~~ done, Windows next), more formats (.eml, .pptx, .xlsx), filters by file type and date.
 3. **MCP for agents:** stdio server with read-only tools, per-collection sharing and access log are done; next: Streamable HTTP for the running app with token and origin checks.
 4. **Distribution:** signed and notarised macOS package, Windows installer, update notice, autostart, quick-ask window.
 

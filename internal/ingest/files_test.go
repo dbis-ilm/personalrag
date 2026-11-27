@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +15,7 @@ func TestExtractMarkdown(t *testing.T) {
 	if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	paras, err := Extract(p)
+	paras, _, err := Extract(context.Background(), p)
 	if err != nil {
 		t.Fatal(err)
 	}

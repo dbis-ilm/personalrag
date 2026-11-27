@@ -97,6 +97,7 @@ export const en: Record<keyof typeof de, string> = {
   'note.ocr': 'No text layer found',
   'note.embedding-unreachable': 'Embedding model not reachable',
   'note.no-text': 'No text found',
+  'note.ocr-read': 'Read with text recognition',
   'note.encrypted': 'File is password-protected',
   'note.corrupt': 'File is damaged or has an invalid format',
   'folder.current': 'Up to date',

@@ -16,6 +16,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/dbis-ilm/personalrag/internal/indexer"
+	"github.com/dbis-ilm/personalrag/internal/ocr"
 	"github.com/dbis-ilm/personalrag/internal/rag"
 	"github.com/dbis-ilm/personalrag/internal/store"
 	"github.com/dbis-ilm/personalrag/internal/testutil"
@@ -96,7 +97,8 @@ func setupWith(t *testing.T, extra map[string][]byte) *fixture {
 			t.Fatal(err)
 		}
 	}
-	deadline := time.Now().Add(10 * time.Second)
+	// Generous: Vision's first text recognition in a new binary takes ~25 s.
+	deadline := time.Now().Add(90 * time.Second)
 	for ix.Progress().Active && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -255,6 +257,26 @@ func TestCountParticipants(t *testing.T) {
 	}
 	if msg := f.call(t, "extract", map[string]any{"document_id": f.ids["geheim.md"], "instruction": "x"}, nil); !strings.Contains(msg, "not found") {
 		t.Fatalf("extract on private document: %q", msg)
+	}
+}
+
+// Agents read a scanned PDF through the recognised text, page markers
+// included (plan item 2.5).
+func TestReadScannedDocument(t *testing.T) {
+	if !ocr.Available() {
+		t.Skip("no text recognition on this system")
+	}
+	scan, err := os.ReadFile("../ocr/testdata/scan.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := setupWith(t, map[string][]byte{"scan.pdf": scan})
+	var out ReadDocumentOut
+	if msg := f.call(t, "read_document", map[string]any{"document_id": f.ids["scan.pdf"], "pages": "2"}, &out); msg != "" {
+		t.Fatal(msg)
+	}
+	if !strings.HasPrefix(out.Text, "[Page 2]") || !strings.Contains(out.Text, "Senatssaal") || strings.Contains(out.Text, "Haushalt") {
+		t.Fatalf("page 2 of the scan: %q", out.Text)
 	}
 }
 

@@ -345,12 +345,12 @@ type ReadDocumentOut struct {
 
 // documentText extracts a document's current text from its file, limited
 // to pages when given. note explains when pages could not be applied.
-func documentText(d store.Document, pages string) (text, note string, err error) {
+func documentText(ctx context.Context, d store.Document, pages string) (text, note string, err error) {
 	sel, err := askyourdocs.ParsePages(pages)
 	if err != nil {
 		return "", "", err
 	}
-	paras, err := ingest.Extract(d.Path)
+	paras, _, err := ingest.Extract(ctx, d.Path)
 	switch {
 	case errors.Is(err, ingest.ErrNeedsOCR):
 		return "", "", errors.New("the document is a scan without a text layer (needs OCR)")
@@ -383,7 +383,7 @@ func (s *Server) readDocument(ctx context.Context, in ReadDocumentIn) (ReadDocum
 	if err != nil {
 		return ReadDocumentOut{}, outcome{}, err
 	}
-	text, note, err := documentText(d, in.Pages)
+	text, note, err := documentText(ctx, d, in.Pages)
 	if err != nil {
 		return ReadDocumentOut{}, outcome{}, err
 	}
@@ -543,7 +543,7 @@ func (s *Server) extract(ctx context.Context, in ExtractIn) (ExtractOut, outcome
 	if err != nil {
 		return ExtractOut{}, outcome{}, err
 	}
-	text, note, err := documentText(d, in.Pages)
+	text, note, err := documentText(ctx, d, in.Pages)
 	if err != nil {
 		return ExtractOut{}, outcome{}, err
 	}
