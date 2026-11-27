@@ -2,6 +2,7 @@ import { Fragment, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 
 import { Events } from '@wailsio/runtime'
 import { AppService, Source, Turn } from '../../bindings/github.com/dbis-ilm/personalrag'
 import Icon from '../components/Icon'
+import ShareMenu from '../components/ShareMenu'
 import { toast } from '../components/Toasts'
 import { errorText } from '../App'
 import { fmtNumber, note, t } from '../i18n'
@@ -375,7 +376,7 @@ export default function AskView({
                           {t('ask.confidence', { level: confidenceLabel(turn.confidence) })}{turn.note && ` · ${turn.note}`}
                         </span>
                         <div style={{ flex: 1 }} />
-                        <button type="button" className="btn" onClick={() => navigator.clipboard?.writeText(turn.answer).then(() => toast(t('ask.copied')))}>{t('common.copy')}</button>
+                        <ShareMenu question={turn.question} answer={turn.answer} sources={turn.sources} />
                       </div>
                     )}
                     {(turn.extending || (turn.done && turn.hasMore && !turn.error)) && (
