@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/firebase/genkit/go/ai"
@@ -56,11 +57,19 @@ const (
 // caller has to reset the vectors (ResetVectors) and re-index.
 var ErrEmbeddingMismatch = errors.New("index was built with a different embedding model")
 
+// openStores counts stores opened and not yet closed, so tests can prove
+// that nothing keeps the index open.
+var openStores atomic.Int64
+
+// OpenCount returns how many stores are open in this process.
+func OpenCount() int64 { return openStores.Load() }
+
 type Store struct {
-	db    *sql.DB
-	emb   ai.Embedder
-	model string
-	dim   int
+	closed atomic.Bool
+	db     *sql.DB
+	emb    ai.Embedder
+	model  string
+	dim    int
 }
 
 type Collection struct {
@@ -119,6 +128,7 @@ func Open(path string, emb ai.Embedder, model string, dim int) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	openStores.Add(1)
 	if err := s.checkEmbedding(); err != nil {
 		return s, err
 	}
@@ -127,7 +137,12 @@ func Open(path string, emb ai.Embedder, model string, dim int) (*Store, error) {
 
 func (s *Store) DB() *sql.DB { return s.db }
 
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	if s.closed.CompareAndSwap(false, true) {
+		openStores.Add(-1)
+	}
+	return s.db.Close()
+}
 
 // indexSteps are the index schema's migrations. Step 1 is idempotent so it
 // adopts databases created before versioning; later steps must not be

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dbis-ilm/personalrag/internal/config"
 	"github.com/dbis-ilm/personalrag/internal/secrets"
+	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
 // fakeGPUStack is an OpenAI-compatible server on 127.0.0.1 with a chat and
@@ -169,5 +170,26 @@ func TestExclusions(t *testing.T) {
 	}
 	if cfg, _ := config.Load(s.dataDir); len(cfg.Exclude) != 2 {
 		t.Fatalf("not persisted: %+v", cfg)
+	}
+}
+
+// Overlapping restarts (e.g. saving connections and then models right away)
+// and a restart still running at shutdown must not leave an index open; on
+// Windows an open index.db cannot be removed.
+func TestRestartsLeaveNothingOpen(t *testing.T) {
+	before := store.OpenCount()
+	s := NewAppService(t.TempDir(), nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := s.ServiceStartup(ctx, application.ServiceOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		s.restartAsync()
+	}
+	s.ServiceShutdown()
+	s.restartAsync() // after shutdown: ignored
+	if n := store.OpenCount() - before; n != 0 {
+		t.Fatalf("%d index database(s) still open after shutdown", n)
 	}
 }

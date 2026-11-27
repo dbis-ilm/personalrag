@@ -245,7 +245,7 @@ func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string
 	if err := s.saveSettings(cfg); err != nil {
 		return err
 	}
-	go s.restartCore()
+	s.restartAsync()
 	return nil
 }
 
@@ -298,7 +298,7 @@ func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote boo
 	if err := s.saveSettings(cand); err != nil {
 		return err
 	}
-	go s.restartCore()
+	s.restartAsync()
 	return nil
 }
 

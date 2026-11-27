@@ -39,8 +39,9 @@ type Logs struct {
 	w       *rotatingWriter
 	handler slog.Handler
 
-	mu    sync.Mutex
-	crash *crashReport // left by the previous run, until taken
+	mu       sync.Mutex
+	crash    *crashReport // left by the previous run, until taken
+	crashSet bool         // this process set the runtime's crash output
 }
 
 type crashReport struct {
@@ -116,6 +117,8 @@ func SetupWith(dataDir, level string, opts Options) (*Logs, error) {
 	if f, err := os.OpenFile(filepath.Join(dir, crashName), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
 		if err := debug.SetCrashOutput(f, debug.CrashOptions{}); err != nil {
 			slog.Warn("crash output not set", "err", err)
+		} else {
+			l.crashSet = true
 		}
 		f.Close()
 	}
@@ -161,8 +164,14 @@ func (l *Logs) Level() string {
 	return strings.ToLower(l.level.Level().String())
 }
 
-// Close flushes and closes the log file.
-func (l *Logs) Close() error { return l.w.Close() }
+// Close closes the log file and releases the crash file the runtime holds
+// open (on Windows an open file cannot be removed).
+func (l *Logs) Close() error {
+	if l.crashSet {
+		_ = debug.SetCrashOutput(nil, debug.CrashOptions{})
+	}
+	return l.w.Close()
+}
 
 // Tail returns up to n last lines of the log, older rotated file included
 // when the current one is short.

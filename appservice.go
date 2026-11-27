@@ -226,9 +226,16 @@ type AppService struct {
 	searches map[int64]cachedSearch
 	order    []int64
 
-	nextID   atomic.Int64
-	debounce *time.Timer
-	debMu    sync.Mutex
+	nextID atomic.Int64
+
+	// restartMu serialises core restarts, so two overlapping restarts can
+	// never both open the index; restarts tracks the asynchronous ones and
+	// closing stops new ones once the service shuts down.
+	restartMu sync.Mutex
+	restarts  sync.WaitGroup
+	closing   bool
+	debounce  *time.Timer
+	debMu     sync.Mutex
 }
 
 type cachedSearch struct {
@@ -270,6 +277,10 @@ func (s *AppService) ServiceStartup(ctx context.Context, _ application.ServiceOp
 
 func (s *AppService) ServiceShutdown() error {
 	s.mu.Lock()
+	s.closing = true
+	s.mu.Unlock()
+	s.restarts.Wait() // a restart in flight must not reopen the index after this
+	s.mu.Lock()
 	c := s.core
 	s.core = nil
 	s.mu.Unlock()
@@ -286,7 +297,24 @@ func (c *core) stop() {
 }
 
 // restartCore (re)builds store, indexer and engine from the settings.
+// restartAsync rebuilds the core in the background unless the service is
+// shutting down.
+func (s *AppService) restartAsync() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closing {
+		return
+	}
+	s.restarts.Add(1)
+	go func() {
+		defer s.restarts.Done()
+		s.restartCore()
+	}()
+}
+
 func (s *AppService) restartCore() {
+	s.restartMu.Lock()
+	defer s.restartMu.Unlock()
 	s.mu.Lock()
 	old := s.core
 	s.core = nil
@@ -309,6 +337,13 @@ func (s *AppService) restartCore() {
 		status.Ready = true
 	}
 	s.mu.Lock()
+	if s.closing {
+		s.mu.Unlock()
+		if c != nil {
+			c.stop()
+		}
+		return
+	}
 	s.core = c
 	s.status = status
 	s.searches = map[int64]cachedSearch{}
