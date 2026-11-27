@@ -320,12 +320,13 @@ function Connections({ ollama, gpu, checking, onRecheck, compact }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="conn">
-        <ProviderStatus title="Ollama" info={tests.ollama ?? ollama} checking={checking} />
+        <ProviderStatus title="Ollama" info={tests.ollama ?? (ollamaHost.trim() ? ollama : undefined)} checking={checking && !!ollamaHost.trim()} emptyText={t('conn.notSetUp')} />
         <div className="conn-row">
           <label htmlFor="ollama-host" className="sr-only">{t('conn.ollamaAddress')}</label>
-          <input id="ollama-host" className="input" value={ollamaHost} onChange={(e) => setOllamaHost(e.target.value)} placeholder="http://localhost:11434" spellCheck={false} />
-          <button type="button" className="btn" onClick={() => test('ollama')}>{t('conn.test')}</button>
+          <input id="ollama-host" className="input" value={ollamaHost} onChange={(e) => { setOllamaHost(e.target.value); setTests((x) => ({ ...x, ollama: undefined })) }} placeholder="http://localhost:11434" spellCheck={false} />
+          <button type="button" className="btn" onClick={() => test('ollama')} disabled={!ollamaHost.trim()}>{t('conn.test')}</button>
         </div>
+        <span className="muted" style={{ fontSize: 12 }}>{t('conn.ollamaHint')}</span>
       </div>
 
       {!showGpu ? (

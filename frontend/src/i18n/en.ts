@@ -206,6 +206,7 @@ export const en: Record<keyof typeof de, string> = {
 
   'conn.ollamaAddress': 'Ollama address',
   'conn.test': 'Test',
+  'conn.ollamaHint': 'Leave empty if you only use a GPUStack server.',
   'conn.addGpu': 'Connect a GPUStack server (optional)',
   'conn.notSetUp': 'Not set up',
   'conn.apiUrl': 'API address',

@@ -193,3 +193,73 @@ func TestRestartsLeaveNothingOpen(t *testing.T) {
 		t.Fatalf("%d index database(s) still open after shutdown", n)
 	}
 }
+
+// TestGPUStackOnlyWithoutOllama: the setup wizard with an empty Ollama
+// address and only a GPUStack server (reported: "Weiter" stayed disabled
+// because the empty Ollama field was rejected).
+func TestGPUStackOnlyWithoutOllama(t *testing.T) {
+	s := startService(t)
+	base := fakeGPUStack(t, "sk-secret")
+
+	if err := s.SaveConnections("", "", "", false); err == nil || !strings.Contains(err.Error(), "Mindestens ein Anbieter") {
+		t.Fatalf("no provider at all accepted: %v", err)
+	}
+	if err := s.SaveConnections("  ", base, "sk-secret", false); err != nil {
+		t.Fatalf("empty Ollama address refused: %v", err)
+	}
+	waitFor(t, "core restart", 10*time.Second, func() bool { return s.Status().Ready })
+
+	if c := s.Connections(); c.OllamaHost != "" || c.GPUStackURL != base {
+		t.Fatalf("connections: %+v", c)
+	}
+	if cfg, _ := config.Load(s.dataDir); !cfg.OllamaOff || cfg.OllamaHost == "" {
+		t.Fatalf("settings: Ollama off %v, address kept %q", cfg.OllamaOff, cfg.OllamaHost)
+	}
+	rt := s.RuntimeInfo()
+	if ol := rt.Providers[0]; ol.Configured || ol.OK || ol.Error != "" {
+		t.Fatalf("Ollama should be not configured, not probed: %+v", ol)
+	}
+	if gpu := rt.Providers[1]; !gpu.OK {
+		t.Fatalf("GPUStack not usable: %+v", gpu)
+	}
+	if rt.SuggestedEmbedding != "gpustack/bge-m3" {
+		t.Errorf("suggested embedding %q", rt.SuggestedEmbedding)
+	}
+
+	if err := s.SaveModels("", "ollama/bge-m3", false); err == nil || !strings.Contains(err.Error(), "ausgeschaltet") {
+		t.Fatalf("Ollama model accepted while Ollama is off: %v", err)
+	}
+	if err := s.SaveModels("gpustack/qwen3-8b", "gpustack/bge-m3", false); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "core with GPUStack only", 10*time.Second, func() bool {
+		st := s.Status()
+		return st.Ready && st.Embedding == "bge-m3"
+	})
+
+	// Turning Ollama on again restores the address; turning GPUStack off
+	// while its models are in use is refused as before.
+	if err := s.SaveConnections("http://localhost:11434", base, "", false); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, _ := config.Load(s.dataDir); cfg.OllamaOff {
+		t.Fatal("Ollama still off")
+	}
+	if err := s.SaveConnections("http://localhost:11434", "", "", false); err == nil {
+		t.Fatal("GPUStack turned off while its models are in use")
+	}
+}
+
+// Turning Ollama off while a model runs on it is refused.
+func TestOllamaOffWhileInUse(t *testing.T) {
+	s := startService(t)
+	base := fakeGPUStack(t, "sk-secret")
+	cfg := s.settings
+	cfg.Embedding = "ollama/bge-m3"
+	if err := s.saveSettings(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveConnections("", base, "sk-secret", false); err == nil || !strings.Contains(err.Error(), "über Ollama") {
+		t.Fatalf("Ollama turned off with its model in use: %v", err)
+	}
+}

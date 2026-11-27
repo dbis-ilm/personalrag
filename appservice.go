@@ -1210,7 +1210,9 @@ func (s *AppService) Diagnostics() string {
 	line("Models: embedding %s, answers %s", emb, llm)
 	ollama := "reachable"
 	ctx, cancel := context.WithTimeout(s.appCtx, 3*time.Second)
-	if _, err := askyourdocs.ListOllamaModels(ctx, cfg.OllamaHost); err != nil {
+	if cfg.OllamaOff {
+		ollama = "off"
+	} else if _, err := askyourdocs.ListOllamaModels(ctx, cfg.OllamaHost); err != nil {
 		ollama = "not reachable"
 	}
 	cancel()
