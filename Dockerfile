@@ -278,8 +278,10 @@ $COMPILER -tags "$TAGS" -trimpath -buildvcs=false \
     -ldflags="$LDFLAGS" \
     -o "bin/${APP}-${GOOS}-${GOARCH}${EXT}" .
 
-# 4. Cleanup temporary syso
+# 4. Cleanup: temporary syso; "-.o" is what zig cc leaves from a compiler
+#    probe that Go feeds on stdin (darwin targets).
 [ "$GOOS" = "windows" ] && rm -f *.syso
+rm -f ./-.o
 
 echo "==> Built: bin/${APP}-${GOOS}-${GOARCH}${EXT}"
 SCRIPT
