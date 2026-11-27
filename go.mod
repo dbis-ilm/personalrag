@@ -10,6 +10,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/wailsapp/wails/v3 v3.1.0
 	github.com/zalando/go-keyring v0.2.8
+	go.starlark.net v0.0.0-20261021141710-4f4267fb140d
 	golang.org/x/sys v0.50.0
 	modernc.org/sqlite v1.63.0
 )

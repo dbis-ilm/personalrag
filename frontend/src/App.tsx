@@ -210,7 +210,7 @@ export default function App() {
         )}
         {view === 'ask' && (
           <AskView
-            scopeId={scope} scopeName={scopeName} searchOnly={status.searchOnly}
+            scopeId={scope} scopeName={scopeName} searchOnly={status.searchOnly} agentModel={status.agent} agentRemote={status.agentRemote} answerLocal={!status.searchOnly && status.llmProvider !== 'GPUStack'}
             hasCollections={collections.length > 0} onAddFolder={addFolder}
             onClearScope={() => setScope('')}
             conversationId={conversationId} onConversation={openConversation} onChanged={reloadHistory}

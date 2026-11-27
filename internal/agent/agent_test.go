@@ -339,3 +339,29 @@ func TestExtractPagesStopAndCache(t *testing.T) {
 		t.Fatal("cache survived re-indexing")
 	}
 }
+
+// Paths reach the agent's model from the collection folder on, never with
+// the user's folders above it.
+func TestRelativePaths(t *testing.T) {
+	c := store.Collection{Folders: []string{filepath.Join("/home", "anna", "Dokumente", "Protokolle")}}
+	if got := relPath(c, filepath.Join("/home", "anna", "Dokumente", "Protokolle", "2026", "a.md")); got != "Protokolle/2026/a.md" {
+		t.Errorf("relPath = %q", got)
+	}
+	if got := relPath(c, filepath.Join("/elsewhere", "b.md")); got != "b.md" {
+		t.Errorf("outside the collection: %q", got)
+	}
+
+	f := setup(t)
+	var out ListDocumentsOut
+	if msg := f.call(t, "list_documents", map[string]any{"folder": "Protokolle/"}, &out); msg != "" {
+		t.Fatal(msg)
+	}
+	if len(out.Documents) == 0 {
+		t.Fatal("folder filter on the relative path found nothing")
+	}
+	for _, d := range out.Documents {
+		if !strings.HasPrefix(d.Path, "Protokolle/") || strings.Contains(d.Path, os.TempDir()) {
+			t.Errorf("path %q", d.Path)
+		}
+	}
+}

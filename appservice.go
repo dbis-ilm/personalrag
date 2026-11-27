@@ -66,11 +66,15 @@ type AppStatus struct {
 	SetupDone  bool   `json:"setupDone"`
 	Ready      bool   `json:"ready"`
 	SearchOnly bool   `json:"searchOnly"` // no answer model
-	LLM        string `json:"llm"`
-	Embedding  string `json:"embedding"`
-	Error      string `json:"error"`
-	DataDir    string `json:"dataDir"`
-	LastCrash  string `json:"lastCrash"` // when the previous run crashed (RFC 3339); "" if it did not
+	Agent      string `json:"agent"`      // model of the agent mode; "" = not available
+	// AgentRemote is the host the agent model runs on when that is another
+	// machine: tasks, document lists and excerpts go there.
+	AgentRemote string `json:"agentRemote"`
+	LLM         string `json:"llm"`
+	Embedding   string `json:"embedding"`
+	Error       string `json:"error"`
+	DataDir     string `json:"dataDir"`
+	LastCrash   string `json:"lastCrash"` // when the previous run crashed (RFC 3339); "" if it did not
 	// Language is the language in use ("de" | "en"); LanguageSetting what
 	// the user chose ("" = follow the system).
 	Language        string `json:"language"`
@@ -260,7 +264,8 @@ type AppService struct {
 	core      *core
 	status    AppStatus
 	searches  map[int64]cachedSearch
-	extending map[int64]bool // turns AskMore is working on
+	extending map[int64]bool               // turns AskMore is working on
+	agentRuns map[int64]context.CancelFunc // running agent tasks by turn
 	order     []int64
 
 	nextID atomic.Int64
@@ -282,7 +287,18 @@ type cachedSearch struct {
 	results  []rag.Result
 }
 
+// agentRuntime is what the agent mode needs: its model and the tools,
+// registered on the core's Genkit.
+type agentRuntime struct {
+	spec   string
+	g      *genkit.Genkit
+	model  ai.Model
+	config any
+	tools  []ai.ToolRef
+}
+
 type core struct {
+	agent  *agentRuntime // nil without a model for the agent mode
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 	st     *store.Store
@@ -380,6 +396,12 @@ func (s *AppService) restartCore() {
 		status.Error = err.Error()
 	} else {
 		status.Ready = true
+		if c.agent != nil {
+			status.Agent = modelName(c.agent.spec)
+			if providerOf(c.agent.spec) == providerGPUStack && !askyourdocs.IsLocalURL(cfg.GPUStackURL) {
+				status.AgentRemote = askyourdocs.URLHost(cfg.GPUStackURL)
+			}
+		}
 	}
 	s.mu.Lock()
 	if s.closing {
@@ -427,6 +449,9 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 	if cfg.LLM != "" {
 		specs = append(specs, cfg.LLM)
 	}
+	if cfg.AgentModel != "" {
+		specs = append(specs, cfg.AgentModel)
+	}
 	providers, err := askyourdocs.NewProviders(
 		askyourdocs.ProviderConfig{OllamaHost: cfg.OllamaHost, GPUStackURL: cfg.GPUStackURL, GPUStackAPIKey: gpuKey, Timeout: 3 * time.Minute},
 		[]string{askyourdocs.ProviderOllama, askyourdocs.ProviderGPUStack}, specs...)
@@ -470,6 +495,20 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 	}
 	if c.eng, err = rag.New(g, c.st, llm, llmCfg); err != nil {
 		return fail(err)
+	}
+	if spec := firstNonEmpty(cfg.AgentModel, cfg.LLM); spec != "" && !s.agentMode {
+		// The agent plans with its own model; extract inside its tools
+		// uses the answer model, like for MCP clients. Without a usable
+		// model the rest of the app still works.
+		if m, err := providers.Model(g, spec); err != nil {
+			slog.Warn("agent model unavailable", "model", spec, "err", err)
+		} else {
+			c.agent = &agentRuntime{
+				spec: spec, g: g, model: m,
+				config: askyourdocs.GenerateConfig(spec, askyourdocs.GenerateOptions{NumCtx: 32768, KeepAlive: "30m"}),
+				tools:  agent.New(c.st, c.eng, version).InApp().Tools(g),
+			}
+		}
 	}
 	if c.hist, err = history.New(c.st.DB(), filepath.Join(s.dataDir, "index.db.history.bak")); err != nil {
 		return fail(err)

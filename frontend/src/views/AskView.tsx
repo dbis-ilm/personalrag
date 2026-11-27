@@ -1,6 +1,7 @@
 import { Fragment, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
-import { AppService, Source, Turn } from '../../bindings/github.com/dbis-ilm/personalrag'
+import { AgentStep, AppService, Source, Turn } from '../../bindings/github.com/dbis-ilm/personalrag'
+import AgentSteps from '../components/AgentSteps'
 import Icon from '../components/Icon'
 import ShareMenu from '../components/ShareMenu'
 import { toast } from '../components/Toasts'
@@ -8,17 +9,17 @@ import { errorText } from '../App'
 import { fmtNumber, note, t } from '../i18n'
 import { caretAllows, emptyHistory, navigate, remember } from '../questionHistory'
 
-type Mode = 'answer' | 'search'
+type Mode = 'answer' | 'search' | 'agent'
 
 // A turn as shown: the stored Turn plus client-only state while it runs.
-type TurnView = Omit<Turn, 'sources'> & { sources: Source[]; searching?: boolean; streaming?: boolean; notice?: string; millis?: number; loadingMore?: boolean; extending?: boolean }
+type TurnView = Omit<Turn, 'sources'> & { sources: Source[]; searching?: boolean; streaming?: boolean; notice?: string; millis?: number; loadingMore?: boolean; extending?: boolean; steps?: AgentStep[] }
 
 const isMac = document.documentElement.classList.contains('platform-mac')
 const mod = () => (isMac ? '⌘' : t('common.ctrl'))
 const narrow = () => window.matchMedia('(max-width: 1180px)').matches
 
 export default function AskView({
-  conversationId, onConversation, onChanged, scopeId, scopeName, searchOnly, hasCollections, onAddFolder, onClearScope,
+  conversationId, onConversation, onChanged, scopeId, scopeName, searchOnly, agentModel, agentRemote, answerLocal, hasCollections, onAddFolder, onClearScope,
 }: {
   conversationId: string
   onConversation: (id: string, collectionId: string) => void
@@ -26,6 +27,9 @@ export default function AskView({
   scopeId: string
   scopeName: string
   searchOnly: boolean
+  agentModel: string // "" = no agent mode
+  agentRemote: string // host the agent model runs on, "" = this machine
+  answerLocal: boolean // the answer model (which reads text for "extract") runs here
   hasCollections: boolean
   onAddFolder: () => void
   onClearScope: () => void
@@ -54,6 +58,7 @@ export default function AskView({
   }
 
   useEffect(() => { if (searchOnly) setMode('search') }, [searchOnly])
+  useEffect(() => { if (!agentModel) setMode((m) => (m === 'agent' ? (searchOnly ? 'search' : 'answer') : m)) }, [agentModel, searchOnly])
 
   useEffect(() => {
     AppService.RecentQuestions().then((l) => { asked.current = emptyHistory(l ?? []) }).catch(() => {})
@@ -96,13 +101,17 @@ export default function AskView({
         ? { ...t, streaming: false, extending: false, done: true, confidence: d.confidence, note: d.note, error: d.error, hasMore: d.hasMore }
         : t)))
     })
+    const offStep = Events.On('agent:step', (ev) => {
+      const s = ev.data
+      setTurns((ts) => ts.map((t) => (t.id === s.turnId ? { ...t, steps: [...(t.steps ?? []), s] } : t)))
+    })
     // Sources added by "evaluate all further matches" arrive before the
     // text that cites them.
     const offSources = Events.On('answer:sources', (ev) => {
       const { turnId, sources } = ev.data
       setTurns((ts) => ts.map((t) => (t.id === turnId ? { ...t, sources: [...t.sources, ...(sources ?? [])] } : t)))
     })
-    return () => { offChunk(); offDone(); offSources() }
+    return () => { offChunk(); offDone(); offSources(); offStep() }
   }, [])
 
   useEffect(() => {
@@ -141,6 +150,20 @@ export default function AskView({
       id: -Date.now(), question: q, standalone: '', mode: m, sources: [], hasMore: false, answer: '', confidence: '', note: '', error: '', done: false, searching: true,
     }
     setTurns((ts) => [...ts, placeholder])
+    if (m === 'agent') {
+      try {
+        const res = await AppService.Agent(conversationId, q, scopeId)
+        setTurns((ts) => ts.map((t) => (t.id === placeholder.id ? { ...placeholder, id: res.turnId, searching: false, streaming: true, steps: [] } : t)))
+        if (res.conversationId !== conversationId) {
+          ownId.current = res.conversationId
+          onConversation(res.conversationId, scopeId)
+        }
+        onChanged()
+      } catch (e) {
+        setTurns((ts) => ts.map((t) => (t.id === placeholder.id ? { ...t, searching: false, done: true, error: errorText(e) } : t)))
+      }
+      return
+    }
     try {
       const res = await AppService.Search(conversationId, q, scopeId, m)
       const found = res.sources ?? []
@@ -267,6 +290,7 @@ export default function AskView({
           <div className="segmented" role="group" aria-label={t('ask.mode')}>
             <button type="button" aria-pressed={mode === 'answer'} disabled={searchOnly} title={searchOnly ? t('ask.noAnswerModel') : undefined} onClick={() => setMode('answer')}>{t('ask.answer')}</button>
             <button type="button" aria-pressed={mode === 'search'} onClick={() => setMode('search')}>{t('ask.searchOnly')}</button>
+            <button type="button" aria-pressed={mode === 'agent'} disabled={!agentModel} title={agentModel ? t('ask.agentHint', { model: agentModel }) : t('ask.noAgentModel')} onClick={() => setMode('agent')}>{t('ask.agent')}</button>
           </div>
           <button
             type="button" className="btn btn-icon" aria-controls="source-panel" aria-expanded={previewOpen}
@@ -304,7 +328,10 @@ export default function AskView({
                 <h1 className={ti === 0 ? 'question' : 'question followup'}>{turn.question}</h1>
                 {turn.standalone && <div className="meta-line">{t('ask.searchedFor', { q: turn.standalone })}</div>}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {turn.mode === 'agent' && (
+                  <AgentSteps steps={turn.steps ?? []} running={!turn.done} model={agentModel} onStop={() => AppService.StopAgent(turn.id)} />
+                )}
+                {turn.mode !== 'agent' && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div className="meta-line">
                     <Icon name="search" size={13} strokeWidth={2} />
                     {turn.searching
@@ -351,9 +378,9 @@ export default function AskView({
                       )}
                     </div>
                   )}
-                </div>
+                </div>}
 
-                {turn.mode === 'answer' && !turn.searching && turn.sources.length > 0 && (
+                {((turn.mode === 'answer' && !turn.searching && turn.sources.length > 0) || (turn.mode === 'agent' && (turn.answer || turn.done) && !turn.error)) && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div className="answer" aria-live={turn.streaming ? 'polite' : undefined}>
                       {turn.answer
@@ -363,18 +390,20 @@ export default function AskView({
                         }, !!turn.streaming)
                         : turn.streaming && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <span className="muted" style={{ fontSize: 12 }}>{t('ask.generating')}</span>
+                            <span className="muted" style={{ fontSize: 12 }}>{turn.mode === 'agent' ? t('agent.thinking') : t('ask.generating')}</span>
                             <div className="skeleton" style={{ width: '92%' }} />
                             <div className="skeleton" style={{ width: '70%' }} />
                           </div>
                         )}
                     </div>
-                    {turn.done && !turn.error && turn.confidence && (
+                    {turn.done && !turn.error && (turn.confidence || (turn.mode === 'agent' && turn.answer)) && (
                       <div className="answer-foot">
-                        <span className={`chip ${turn.confidence === 'high' ? 'kind-ok' : turn.confidence === 'medium' ? 'kind-warn' : 'kind-error'}`} style={{ fontSize: 12.5, padding: '5px 10px', borderRadius: 14 }}>
-                          <Icon name={turn.confidence === 'high' ? 'check' : 'alert'} size={13} strokeWidth={2.4} />
-                          {t('ask.confidence', { level: confidenceLabel(turn.confidence) })}{turn.note && ` · ${turn.note}`}
-                        </span>
+                        {turn.confidence ? (
+                          <span className={`chip ${turn.confidence === 'high' ? 'kind-ok' : turn.confidence === 'medium' ? 'kind-warn' : 'kind-error'}`} style={{ fontSize: 12.5, padding: '5px 10px', borderRadius: 14 }}>
+                            <Icon name={turn.confidence === 'high' ? 'check' : 'alert'} size={13} strokeWidth={2.4} />
+                            {t('ask.confidence', { level: confidenceLabel(turn.confidence) })}{turn.note && ` · ${turn.note}`}
+                          </span>
+                        ) : <span className="muted" style={{ fontSize: 12.5 }}>{t('ask.agent')} · {turn.note}</span>}
                         <div style={{ flex: 1 }} />
                         <ShareMenu question={turn.question} answer={turn.answer} sources={turn.sources} />
                       </div>
@@ -399,6 +428,9 @@ export default function AskView({
           </div>
         </div>
 
+        {mode === 'agent' && agentRemote && (
+          <div className="inline-note agent-remote"><Icon name="alert" size={13} strokeWidth={2.2} />{t('agent.remote', { host: agentRemote })}{answerLocal && ` ${t('agent.remoteLocalExtract')}`}</div>
+        )}
         <form className="composer" onSubmit={(e) => { e.preventDefault(); run(draft) }}>
           <div className="composer-box">
             <label htmlFor="q" className="sr-only">{turns.length ? t('ask.followupLabel') : t('ask.questionLabel')}</label>
@@ -512,6 +544,17 @@ function renderAnswer(text: string, cite: (n: number) => void, streaming: boolea
   return paras.map((p, pi) => {
     const caret = streaming && pi === paras.length - 1 ? <span className="caret" aria-hidden="true" /> : null
     const lines = p.split('\n')
+    if (lines.length >= 2 && lines.every((l) => l.trim().startsWith('|')) && /^\s*\|?\s*:?-{2,}/.test(lines[1])) {
+      const cells = (l: string) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+      return (
+        <div key={pi} className="table-wrap answer-table">
+          <table>
+            <thead><tr>{cells(lines[0]).map((c, ci) => <th key={ci}>{inline(c)}</th>)}</tr></thead>
+            <tbody>{lines.slice(2).map((l, li) => <tr key={li}>{cells(l).map((c, ci) => <td key={ci}>{inline(c)}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      )
+    }
     if (lines.every((l) => /^\s*([-*]|\d+\.)\s+/.test(l))) {
       return (
         <ul key={pi}>

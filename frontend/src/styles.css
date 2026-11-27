@@ -327,3 +327,19 @@ mark.term { background: transparent; color: var(--accent-text); font-weight: 650
   .print-area h3 { font-size: 12pt; margin: 18pt 0 6pt; }
   .print-area p, .print-area li { margin: 0 0 6pt; }
 }
+
+/* ---------- Agent mode ---------- */
+.agent-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-subtle); }
+.agent-box summary { cursor: pointer; }
+.agent-steps { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.agent-steps li { display: grid; grid-template-columns: 9em 1fr auto; column-gap: 10px; color: var(--text-2); }
+.agent-steps .agent-tool { font-weight: 600; color: var(--text); grid-row: span 2; }
+.agent-steps .agent-input { overflow-wrap: anywhere; }
+.agent-steps .agent-result { grid-column: 2; color: var(--muted); overflow-wrap: anywhere; }
+.agent-steps .agent-time { grid-column: 3; grid-row: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+.agent-steps li.is-error .agent-result { color: var(--err); }
+.spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+.answer-table table { min-width: 0; }
+.agent-remote { margin: 0 auto 8px; max-width: 760px; width: calc(100% - 32px); }

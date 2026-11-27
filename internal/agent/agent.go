@@ -63,6 +63,7 @@ type Server struct {
 	st      *store.Store
 	eng     *rag.Engine
 	version string
+	all     bool // in-app agent: every collection, not only shared ones
 }
 
 func New(st *store.Store, eng *rag.Engine, version string) *Server {
@@ -163,7 +164,7 @@ func (s *Server) shared(ctx context.Context) (map[string]store.Collection, error
 	}
 	out := map[string]store.Collection{}
 	for _, c := range colls {
-		if c.SharedWithAgents {
+		if c.SharedWithAgents || s.all {
 			out[c.ID] = c
 		}
 	}
@@ -221,7 +222,7 @@ func (s *Server) listCollections(ctx context.Context, _ struct{}) (ListCollectio
 
 type ListDocumentsIn struct {
 	CollectionID   string `json:"collection_id,omitempty" jsonschema:"only this collection (id from list_collections)"`
-	Folder         string `json:"folder,omitempty" jsonschema:"only documents whose path contains this text"`
+	Folder         string `json:"folder,omitempty" jsonschema:"only documents whose path (from the collection folder on, as in path) contains this text"`
 	Format         string `json:"format,omitempty" jsonschema:"only this format: PDF, Word, Markdown, Text or HTML"`
 	ModifiedAfter  string `json:"modified_after,omitempty" jsonschema:"only documents modified on or after this date (YYYY-MM-DD)"`
 	ModifiedBefore string `json:"modified_before,omitempty" jsonschema:"only documents modified before this date (YYYY-MM-DD)"`
@@ -246,13 +247,38 @@ type ListDocumentsOut struct {
 	NextOffset int           `json:"next_offset" jsonschema:"0 when this page is the last"`
 }
 
-func toDocumentOut(d store.Document) DocumentOut {
+func toDocumentOut(d store.Document, colls map[string]store.Collection) DocumentOut {
 	mod := ""
 	if d.ModTime > 0 {
 		mod = time.Unix(d.ModTime, 0).Format("2006-01-02")
 	}
-	return DocumentOut{ID: d.ID, Name: filepath.Base(d.Path), Path: paths.Display(d.Path), Collection: d.CollectionID,
+	return DocumentOut{ID: d.ID, Name: filepath.Base(d.Path), Path: relPath(colls[d.CollectionID], d.Path), Collection: d.CollectionID,
 		Format: d.Format, Modified: mod, Status: d.Status, Note: d.Note}
+}
+
+// relPath shows a document's path from its collection folder on, e.g.
+// "Protokolle/2026/sitzung-04.pdf": enough to tell documents and folders
+// apart, without the user's folder structure above the collection, which
+// would otherwise reach the agent's model provider.
+func relPath(c store.Collection, p string) string {
+	for _, f := range c.Folders {
+		if paths.Within(p, f) {
+			if rel, err := filepath.Rel(f, p); err == nil {
+				return filepath.ToSlash(filepath.Join(filepath.Base(f), rel))
+			}
+		}
+	}
+	return filepath.Base(p)
+}
+
+// collections is shared() for output formatting; on error paths fall back
+// to the file name.
+func (s *Server) collections(ctx context.Context) map[string]store.Collection {
+	sh, err := s.shared(ctx)
+	if err != nil {
+		return nil
+	}
+	return sh
 }
 
 func (s *Server) listDocuments(ctx context.Context, in ListDocumentsIn) (ListDocumentsOut, outcome, error) {
@@ -282,7 +308,7 @@ func (s *Server) listDocuments(ctx context.Context, in ListDocumentsIn) (ListDoc
 		if _, ok := sh[d.CollectionID]; !ok {
 			continue
 		}
-		if in.Folder != "" && !strings.Contains(strings.ToLower(d.Path), strings.ToLower(in.Folder)) {
+		if in.Folder != "" && !strings.Contains(strings.ToLower(filepath.ToSlash(relPath(sh[d.CollectionID], d.Path))), strings.ToLower(filepath.ToSlash(in.Folder))) {
 			continue
 		}
 		if in.Format != "" && !strings.EqualFold(d.Format, in.Format) {
@@ -294,7 +320,7 @@ func (s *Server) listDocuments(ctx context.Context, in ListDocumentsIn) (ListDoc
 		if !before.IsZero() && d.ModTime >= before.Unix() {
 			continue
 		}
-		match = append(match, toDocumentOut(d))
+		match = append(match, toDocumentOut(d, sh))
 	}
 	limit := in.Limit
 	if limit <= 0 {
@@ -395,7 +421,7 @@ func (s *Server) readDocument(ctx context.Context, in ReadDocumentIn) (ReadDocum
 	n = min(n, maxReadChars)
 	from := min(max(in.Offset, 0), len(r))
 	to := min(from+n, len(r))
-	out := ReadDocumentOut{Document: toDocumentOut(d), Text: string(r[from:to]), Offset: from, TotalChars: len(r), Note: note}
+	out := ReadDocumentOut{Document: toDocumentOut(d, s.collections(ctx)), Text: string(r[from:to]), Offset: from, TotalChars: len(r), Note: note}
 	if to < len(r) {
 		out.NextOffset = to
 	}
@@ -473,6 +499,7 @@ func (s *Server) searchDocuments(ctx context.Context, in SearchIn) (SearchOut, o
 		all = all[:limit]
 	}
 	var warn []string
+	colls := s.collections(ctx)
 	for _, r := range all {
 		h := r.Hit
 		var loc []string
@@ -485,7 +512,7 @@ func (s *Server) searchDocuments(ctx context.Context, in SearchIn) (SearchOut, o
 		text := askyourdocs.SanitizeUntrusted(h.Text)
 		warn = append(warn, askyourdocs.DetectInjection(text)...)
 		out.Passages = append(out.Passages, PassageOut{
-			DocumentID: h.DocumentID, Name: filepath.Base(h.Path), Path: paths.Display(h.Path), Collection: h.CollectionID,
+			DocumentID: h.DocumentID, Name: filepath.Base(h.Path), Path: relPath(colls[h.CollectionID], h.Path), Collection: h.CollectionID,
 			Location: strings.Join(loc, " · "), Score: h.Score, Text: text,
 		})
 	}
@@ -553,7 +580,7 @@ func (s *Server) extract(ctx context.Context, in ExtractIn) (ExtractOut, outcome
 	if in.Pages != "" && note == "" {
 		label = "Seiten " + in.Pages + ", "
 	}
-	out := ExtractOut{Document: toDocumentOut(d), Parts: []ExtractPart{}, Note: note}
+	out := ExtractOut{Document: toDocumentOut(d, s.collections(ctx)), Parts: []ExtractPart{}, Note: note}
 	cached := 0
 	for i, p := range parts {
 		if err := ctx.Err(); err != nil {
