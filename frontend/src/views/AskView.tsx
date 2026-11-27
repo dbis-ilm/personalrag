@@ -9,7 +9,7 @@ import { fmtNumber, note, t } from '../i18n'
 type Mode = 'answer' | 'search'
 
 // A turn as shown: the stored Turn plus client-only state while it runs.
-type TurnView = Omit<Turn, 'sources'> & { sources: Source[]; searching?: boolean; streaming?: boolean; notice?: string; millis?: number }
+type TurnView = Omit<Turn, 'sources'> & { sources: Source[]; searching?: boolean; streaming?: boolean; notice?: string; millis?: number; loadingMore?: boolean; extending?: boolean }
 
 const isMac = document.documentElement.classList.contains('platform-mac')
 const mod = () => (isMac ? '⌘' : t('common.ctrl'))
@@ -86,10 +86,16 @@ export default function AskView({
     const offDone = Events.On('answer:done', (ev) => {
       const d = ev.data
       setTurns((ts) => ts.map((t) => (t.id === d.turnId
-        ? { ...t, streaming: false, done: true, confidence: d.confidence, note: d.note, error: d.error }
+        ? { ...t, streaming: false, extending: false, done: true, confidence: d.confidence, note: d.note, error: d.error, hasMore: d.hasMore }
         : t)))
     })
-    return () => { offChunk(); offDone() }
+    // Sources added by "evaluate all further matches" arrive before the
+    // text that cites them.
+    const offSources = Events.On('answer:sources', (ev) => {
+      const { turnId, sources } = ev.data
+      setTurns((ts) => ts.map((t) => (t.id === turnId ? { ...t, sources: [...t.sources, ...(sources ?? [])] } : t)))
+    })
+    return () => { offChunk(); offDone(); offSources() }
   }, [])
 
   useEffect(() => {
@@ -124,7 +130,7 @@ export default function AskView({
     const m = mode
     setDraft('')
     const placeholder: TurnView = {
-      id: -Date.now(), question: q, standalone: '', mode: m, sources: [], answer: '', confidence: '', note: '', error: '', done: false, searching: true,
+      id: -Date.now(), question: q, standalone: '', mode: m, sources: [], hasMore: false, answer: '', confidence: '', note: '', error: '', done: false, searching: true,
     }
     setTurns((ts) => [...ts, placeholder])
     try {
@@ -132,7 +138,7 @@ export default function AskView({
       const found = res.sources ?? []
       const wantAnswer = m === 'answer' && found.length > 0
       const turn: TurnView = {
-        ...placeholder, id: res.turnId, standalone: res.standalone, sources: found,
+        ...placeholder, id: res.turnId, standalone: res.standalone, sources: found, hasMore: res.hasMore,
         notice: res.notice, millis: res.millis, searching: false, streaming: wantAnswer, done: !wantAnswer,
       }
       const index = turnsRef.current.findIndex((t) => t.id === placeholder.id)
@@ -148,6 +154,36 @@ export default function AskView({
       setTurns((ts) => ts.map((t) => (t.id === placeholder.id || t.searching || t.streaming
         ? { ...t, searching: false, streaming: false, done: true, error: errorText(e) }
         : t)))
+    }
+  }
+
+  // showMore appends the next matches of a search turn.
+  const showMore = async (index: number) => {
+    const turn = turnsRef.current[index]
+    if (!turn || turn.loadingMore) return
+    const patch = (p: Partial<TurnView>) => setTurns((ts) => ts.map((x) => (x.id === turn.id ? { ...x, ...p } : x)))
+    patch({ loadingMore: true })
+    try {
+      const r = await AppService.MoreSources(turn.id)
+      const added = r.sources ?? []
+      setTurns((ts) => ts.map((x) => (x.id === turn.id ? { ...x, sources: [...x.sources, ...added], hasMore: r.hasMore, loadingMore: false } : x)))
+      if (added.length === 0) toast(t('ask.noMore'))
+    } catch (e) {
+      patch({ loadingMore: false })
+      toast(errorText(e), 'error')
+    }
+  }
+
+  // askMore evaluates the matches beyond the first page and extends the
+  // answer; progress arrives as answer events.
+  const askMore = async (turn: TurnView) => {
+    if (turn.extending) return
+    setTurns((ts) => ts.map((x) => (x.id === turn.id ? { ...x, extending: true, streaming: true } : x)))
+    try {
+      await AppService.AskMore(turn.id)
+    } catch (e) {
+      setTurns((ts) => ts.map((x) => (x.id === turn.id ? { ...x, extending: false, streaming: false } : x)))
+      toast(errorText(e), 'error')
     }
   }
 
@@ -250,7 +286,7 @@ export default function AskView({
                     <Icon name="search" size={13} strokeWidth={2} />
                     {turn.searching
                       ? <span>{t('ask.searching')}</span>
-                      : <span>{t('ask.hits', { count: turn.sources.length })}{turn.millis !== undefined && ` · ${fmtNumber(turn.millis / 1000, 2)} s`}</span>}
+                      : <span>{turn.hasMore ? t('ask.hitsMore', { count: turn.sources.length }) : t('ask.hits', { count: turn.sources.length })}{turn.millis !== undefined && ` · ${fmtNumber(turn.millis / 1000, 2)} s`}</span>}
                   </div>
                   {turn.notice && <div className="inline-note"><Icon name="alert" size={13} strokeWidth={2.2} />{turn.notice}</div>}
                   {!turn.searching && turn.sources.length === 0 && !turn.error && (
@@ -259,6 +295,9 @@ export default function AskView({
 
                   {turn.mode === 'answer' ? (
                     <div className="source-grid">
+                      {turn.sources.length > 4 && (
+                        <span className="muted source-rest">{t('ask.moreSources', { count: turn.sources.length - 4 })}</span>
+                      )}
                       {turn.sources.slice(0, 4).map((s, i) => (
                         <button key={s.chunkId} type="button" className="source-card" aria-pressed={active.turn === ti && active.src === i} onClick={() => show(ti, i)}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -282,6 +321,11 @@ export default function AskView({
                           <span className="score-bar" aria-label={t('ask.relevance', { pct: Math.round(s.score * 100) })}><span style={{ width: `${Math.round(s.score * 100)}%` }} /></span>
                         </button>
                       ))}
+                      {turn.hasMore && !turn.searching && (
+                        <button type="button" className="btn more-btn" disabled={turn.loadingMore} onClick={() => showMore(ti)}>
+                          {turn.loadingMore ? t('ask.loadingMore') : t('ask.more')}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -310,6 +354,17 @@ export default function AskView({
                         </span>
                         <div style={{ flex: 1 }} />
                         <button type="button" className="btn" onClick={() => navigator.clipboard?.writeText(turn.answer).then(() => toast(t('ask.copied')))}>{t('common.copy')}</button>
+                      </div>
+                    )}
+                    {(turn.extending || (turn.done && turn.hasMore && !turn.error)) && (
+                      <div className="more-row" aria-live="polite">
+                        {turn.extending
+                          ? <span className="muted" style={{ fontSize: 12.5 }}>{t('ask.extending', { count: turn.sources.length })}</span>
+                          : (
+                            <button type="button" className="btn" onClick={() => askMore(turn)} title={t('ask.askMoreHint')}>
+                              <Icon name="search" size={13} strokeWidth={2.2} />{t('ask.askMore')}
+                            </button>
+                          )}
                       </div>
                     )}
                   </div>

@@ -43,6 +43,7 @@ var catalog = map[string]entry{
 
 	// Asking
 	"search.keywordOnly":  {"Nur Volltextsuche: Das Embedding-Modell ist nicht erreichbar.", "Keyword search only: the embedding model is not reachable."},
+	"search.empty":        {"Bitte eine Frage eingeben", "Please enter a question"},
 	"search.expired":      {"Die Suche ist abgelaufen, bitte erneut fragen", "The search has expired, please ask again"},
 	"answer.failed":       {"Die Antwort konnte nicht erzeugt werden: %s", "The answer could not be generated: %s"},
 	"answer.nothingFound": {"In deinen Dokumenten habe ich dazu nichts gefunden.", "I found nothing about this in your documents."},
@@ -50,6 +51,8 @@ var catalog = map[string]entry{
 	"answer.fallback":     {"keine Quelle eindeutig relevant", "no source clearly relevant"},
 	"answer.used":         {"%d von %d Treffern verwendet", "%d of %d matches used"},
 	"answer.usedBudget":   {"%d von %d Treffern verwendet; %d weitere relevante waren zu lang für die Antwort", "%d of %d matches used; %d more relevant ones were too long for the answer"},
+	"answer.moreDone":     {"%d Quellen zitiert, %d Treffer ausgewertet", "%d sources cited, %d matches evaluated"},
+	"answer.moreNothing":  {"Keine weiteren relevanten Fundstellen (%d Treffer ausgewertet)", "No further relevant passages (%d matches evaluated)"},
 	"answer.interrupted":  {"Antwort wurde nicht fertiggestellt (App beendet).", "The answer was not finished (the app was closed)."},
 
 	// Connections and models

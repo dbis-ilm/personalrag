@@ -186,6 +186,18 @@ func (s *Store) AddTurn(ctx context.Context, t Turn) (int64, error) {
 	return id, tx.Commit()
 }
 
+// SetSources replaces a turn's source snapshot, e.g. after "show more".
+func (s *Store) SetSources(ctx context.Context, id int64, sources []byte) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE turns SET sources = ? WHERE id = ?`, string(sources), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // Finish stores the outcome of an answer.
 func (s *Store) Finish(ctx context.Context, id int64, answer, confidence, note, errText string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE turns SET answer = ?, confidence = ?, note = ?, error = ?, done = 1 WHERE id = ?`,

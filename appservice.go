@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,6 +47,7 @@ const (
 	EventStatusChanged  = "status:changed"
 	EventNotice         = "notice"
 	EventShowAbout      = "about:show"
+	EventAnswerSources  = "answer:sources"
 )
 
 // ShowAbout asks the window to open the About box (from the app or tray menu).
@@ -103,6 +105,7 @@ type Turn struct {
 	Standalone string   `json:"standalone"` // follow-up rewritten for search; "" if unchanged
 	Mode       string   `json:"mode"`       // "answer" | "search"
 	Sources    []Source `json:"sources"`
+	HasMore    bool     `json:"hasMore"` // further matches may exist (search: show more, answer: AskMore)
 	Answer     string   `json:"answer"`
 	Confidence string   `json:"confidence"`
 	Note       string   `json:"note"`
@@ -138,9 +141,21 @@ type SearchResult struct {
 	TurnID         int64    `json:"turnId"`
 	Standalone     string   `json:"standalone"`
 	Sources        []Source `json:"sources"`
+	HasMore        bool     `json:"hasMore"` // MoreSources may find further matches
 	Millis         int      `json:"millis"`
 	Notice         string   `json:"notice"`
 }
+
+// MoreResult is the next page of a search turn's sources.
+type MoreResult struct {
+	Sources []Source `json:"sources"`
+	HasMore bool     `json:"hasMore"`
+}
+
+const (
+	morePage = 8  // sources per "show more"
+	maxShown = 96 // sources a turn shows at most
+)
 
 type AnswerChunk struct {
 	TurnID int64  `json:"turnId"`
@@ -152,6 +167,14 @@ type AnswerDone struct {
 	Confidence string `json:"confidence"` // "high" | "medium" | "low"
 	Note       string `json:"note"`
 	Error      string `json:"error"`
+	HasMore    bool   `json:"hasMore"` // AskMore may find further matches
+}
+
+// AnswerSources carries sources added to a turn by AskMore, sent before
+// the text that cites them.
+type AnswerSources struct {
+	TurnID  int64    `json:"turnId"`
+	Sources []Source `json:"sources"`
 }
 
 type IndexProgress struct {
@@ -232,12 +255,13 @@ type AppService struct {
 	lastCrash string // label of the previous run's crash, if any
 	crashText string
 
-	mu       sync.RWMutex
-	settings config.Settings
-	core     *core
-	status   AppStatus
-	searches map[int64]cachedSearch
-	order    []int64
+	mu        sync.RWMutex
+	settings  config.Settings
+	core      *core
+	status    AppStatus
+	searches  map[int64]cachedSearch
+	extending map[int64]bool // turns AskMore is working on
+	order     []int64
 
 	nextID atomic.Int64
 
@@ -881,7 +905,7 @@ func toProgress(p indexer.Progress) IndexProgress {
 func (s *AppService) Search(conversationID, question, collectionID, mode string) (SearchResult, error) {
 	question = strings.TrimSpace(question)
 	if question == "" {
-		return SearchResult{Sources: []Source{}}, errors.New("Leere Frage")
+		return SearchResult{Sources: []Source{}}, i18n.Errorf("search.empty")
 	}
 	if mode != "search" {
 		mode = "answer"
@@ -928,6 +952,7 @@ func (s *AppService) Search(conversationID, question, collectionID, mode string)
 	for _, r := range res.Results {
 		out.Sources = append(out.Sources, toSource(r, best))
 	}
+	out.HasMore = len(res.Results) == rag.MaxSources
 	snapshot, err := json.Marshal(out.Sources)
 	if err != nil {
 		return SearchResult{}, err
@@ -951,6 +976,190 @@ func (s *AppService) Search(conversationID, question, collectionID, mode string)
 	s.mu.Unlock()
 	return out, nil
 }
+
+// mayHaveMore guesses for a stored turn whether "show more" could
+// find further matches: every page so far came back full. A wrong guess
+// costs one click that finds nothing.
+func mayHaveMore(shown int) bool {
+	return shown >= rag.MaxSources && (shown-rag.MaxSources)%morePage == 0 && shown < maxShown
+}
+
+// MoreSources finds the next matches of a search turn and appends them to
+// its stored sources.
+func (s *AppService) MoreSources(turnID int64) (MoreResult, error) {
+	c, err := s.current()
+	if err != nil {
+		return MoreResult{}, err
+	}
+	p, err := s.nextPage(c, turnID)
+	if err != nil {
+		return MoreResult{}, err
+	}
+	return MoreResult{Sources: p.sources, HasMore: p.hasMore}, nil
+}
+
+// page is one "show more" step: the new sources for the UI, the same
+// matches for the answer model, and whether more may follow.
+type page struct {
+	question string
+	sources  []Source
+	results  []rag.Result
+	shown    int // sources of the turn including this page
+	hasMore  bool
+}
+
+// nextPage finds the next matches of a turn and appends them to its stored
+// sources. Matches already shown are skipped, since a deeper search can
+// reorder the fused ranking a little.
+func (s *AppService) nextPage(c *core, turnID int64) (page, error) {
+	t, err := c.hist.Turn(s.appCtx, turnID)
+	if err != nil {
+		return page{}, err
+	}
+	conv, _, err := c.hist.Get(s.appCtx, t.ConversationID)
+	if err != nil {
+		return page{}, err
+	}
+	var shown []Source
+	if len(t.Sources) > 0 {
+		if err := json.Unmarshal(t.Sources, &shown); err != nil {
+			return page{}, err
+		}
+	}
+	out := page{question: firstNonEmpty(t.Standalone, t.Question), sources: []Source{}, shown: len(shown)}
+	if len(shown) >= maxShown {
+		return out, nil
+	}
+	want := min(len(shown)+morePage, maxShown)
+	res, err := c.eng.SearchN(s.appCtx, out.question, conv.CollectionID, want)
+	if err != nil {
+		return page{}, err
+	}
+	seen := make(map[int64]bool, len(shown))
+	for _, src := range shown {
+		seen[src.ChunkID] = true
+	}
+	best := 0.0
+	if len(res.Results) > 0 {
+		best = res.Results[0].Hit.Score
+	}
+	for _, r := range res.Results {
+		if seen[r.Hit.ChunkID] || len(out.sources) == morePage {
+			continue
+		}
+		r.N = len(shown) + len(out.sources) + 1
+		out.sources = append(out.sources, toSource(r, best))
+		out.results = append(out.results, r)
+	}
+	all := append(shown, out.sources...)
+	out.shown = len(all)
+	out.hasMore = len(res.Results) == want && len(out.sources) == morePage && len(all) < maxShown
+	snapshot, err := json.Marshal(all)
+	if err != nil {
+		return page{}, err
+	}
+	if err := c.hist.SetSources(s.appCtx, turnID, snapshot); err != nil {
+		return page{}, err
+	}
+	return out, nil
+}
+
+// AskMore extends an answer with the matches beyond the first page, for
+// questions like "show me all …": page by page (8 matches) it rates the
+// next matches and appends what the relevant ones add, until a page has
+// no relevant match, the matches run out or 96 are shown. New sources
+// arrive as answer:sources events before the text citing them; the end is
+// an answer:done event as for Ask.
+func (s *AppService) AskMore(turnID int64) error {
+	c, err := s.current()
+	if err != nil {
+		return err
+	}
+	if !c.eng.HasModel() {
+		return i18n.Errorf("core.noAnswerModel")
+	}
+	t, err := c.hist.Turn(s.appCtx, turnID)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if s.extending[turnID] {
+		s.mu.Unlock()
+		return nil // already running
+	}
+	if s.extending == nil {
+		s.extending = map[int64]bool{}
+	}
+	s.extending[turnID] = true
+	s.mu.Unlock()
+
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			delete(s.extending, turnID)
+			s.mu.Unlock()
+		}()
+		answer := t.Answer
+		done := AnswerDone{TurnID: turnID, Confidence: confidenceCode(t.Confidence)}
+		var lastErr error
+		shown, added := 0, 0
+		for {
+			p, err := s.nextPage(c, turnID)
+			if err != nil {
+				lastErr = err
+				break
+			}
+			shown = p.shown
+			done.HasMore = p.hasMore
+			if len(p.sources) == 0 {
+				done.HasMore = false
+				break
+			}
+			s.emit(EventAnswerSources, AnswerSources{TurnID: turnID, Sources: p.sources})
+			more, err := c.eng.AnswerMore(s.appCtx, p.question, answer, p.results)
+			if err != nil {
+				lastErr = err
+				break
+			}
+			if more.Text != "" {
+				chunk := "\n\n" + more.Text
+				answer += chunk
+				added++
+				s.emit(EventAnswerChunk, AnswerChunk{TurnID: turnID, Text: chunk})
+				_ = c.hist.SavePartial(s.appCtx, turnID, answer)
+			}
+			if more.Relevant == 0 || !p.hasMore {
+				break // a page without a relevant match ends the search
+			}
+		}
+		done.Note = i18n.T("answer.moreDone", len(citedNumbers(answer)), shown)
+		if added == 0 && lastErr == nil {
+			done.Note = i18n.T("answer.moreNothing", shown)
+		}
+		if lastErr != nil {
+			slog.Error("extending answer failed", "err", lastErr)
+			done.Error = i18n.T("answer.failed", lastErr.Error())
+		}
+		if err := c.hist.Finish(s.appCtx, turnID, answer, done.Confidence, done.Note, done.Error); err != nil {
+			slog.Error("history: saving answer failed", "err", err)
+		}
+		s.emit(EventAnswerDone, done)
+	}()
+	return nil
+}
+
+// citedNumbers returns the distinct source numbers an answer cites.
+func citedNumbers(answer string) map[int]bool {
+	out := map[int]bool{}
+	for _, m := range citeNumber.FindAllStringSubmatch(answer, -1) {
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			out[n] = true
+		}
+	}
+	return out
+}
+
+var citeNumber = regexp.MustCompile(`\[(\d+)\]`)
 
 // Ask streams the answer for a turn via answer:chunk events, finishes with
 // answer:done and stores the result in the conversation.
@@ -979,7 +1188,7 @@ func (s *AppService) Ask(turnID int64) error {
 				lastSave = time.Now()
 			}
 		})
-		done := AnswerDone{TurnID: turnID, Confidence: string(ans.Confidence), Note: answerNote(ans)}
+		done := AnswerDone{TurnID: turnID, Confidence: string(ans.Confidence), Note: answerNote(ans), HasMore: err == nil && len(cs.results) == rag.MaxSources}
 		if err != nil {
 			slog.Error("answer failed", "err", err)
 			done.Error = i18n.T("answer.failed", err.Error())
@@ -1027,7 +1236,8 @@ func (s *AppService) Conversation(id string) (ConversationDetail, error) {
 		}
 		out.Turns = append(out.Turns, Turn{
 			ID: t.ID, Question: t.Question, Standalone: t.Standalone, Mode: t.Mode, Sources: src,
-			Answer: t.Answer, Confidence: confidenceCode(t.Confidence), Note: t.Note, Error: t.Error, Done: t.Done,
+			HasMore: mayHaveMore(len(src)),
+			Answer:  t.Answer, Confidence: confidenceCode(t.Confidence), Note: t.Note, Error: t.Error, Done: t.Done,
 		})
 	}
 	return out, nil

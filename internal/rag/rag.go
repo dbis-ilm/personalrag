@@ -67,6 +67,7 @@ type Engine struct {
 	llmConfig any
 	rerank    ai.Prompt
 	qa        ai.Prompt
+	qaMore    ai.Prompt
 	condense  ai.Prompt
 	extract   ai.Prompt
 }
@@ -76,10 +77,11 @@ func New(g *genkit.Genkit, st *store.Store, llm ai.Model, llmConfig any) (*Engin
 	e := &Engine{g: g, st: st, llm: llm, llmConfig: llmConfig}
 	e.rerank = genkit.LookupPrompt(g, "rerank")
 	e.qa = genkit.LookupPrompt(g, "qa")
+	e.qaMore = genkit.LookupPrompt(g, "qa_more")
 	e.condense = genkit.LookupPrompt(g, "condense")
 	e.extract = genkit.LookupPrompt(g, "extract")
-	if e.rerank == nil || e.qa == nil || e.condense == nil || e.extract == nil {
-		return nil, errors.New("prompts rerank/qa/condense/extract not loaded")
+	if e.rerank == nil || e.qa == nil || e.qaMore == nil || e.condense == nil || e.extract == nil {
+		return nil, errors.New("prompts rerank/qa/qa_more/condense/extract not loaded")
 	}
 	return e, nil
 }
@@ -100,18 +102,30 @@ func (e *Engine) Condense(ctx context.Context, question string, history []askyou
 	return askyourdocs.CondenseFollowUp(ctx, e.condense, e.llm, e.llmConfig, question, history)
 }
 
+// MaxSources is how many results a search shows at first (and how many an
+// answer is built from); "show more" asks SearchN for further ones.
+const MaxSources = maxSources
+
 // Search runs vector and keyword search and fuses them. A failing vector
 // search (e.g. embedding model unreachable) degrades to keyword search.
 func (e *Engine) Search(ctx context.Context, question, collectionID string) (Search, error) {
+	return e.SearchN(ctx, question, collectionID, maxSources)
+}
+
+// SearchN is Search for up to n results; the candidate lists grow with n.
+// Deeper lists can reorder the fused ranking slightly, so a caller paging
+// through results should skip chunks it has already shown.
+func (e *Engine) SearchN(ctx context.Context, question, collectionID string, n int) (Search, error) {
 	var out Search
-	vec, err := e.st.Retrieve(ctx, question, candidatesPerList, collectionID)
+	candidates := max(candidatesPerList, n)
+	vec, err := e.st.Retrieve(ctx, question, candidates, collectionID)
 	if err != nil {
 		slog.WarnContext(ctx, "vector search failed, keyword only", "err", err)
 		out.VectorErr = err
 	}
-	kw, err := e.st.KeywordSearch(ctx, question, candidatesPerList, collectionID, store.GermanStopWords)
+	kw, err := e.st.KeywordSearch(ctx, question, candidates, collectionID, store.GermanStopWords)
 	if err != nil {
-		return out, fmt.Errorf("Volltextsuche: %w", err)
+		return out, fmt.Errorf("keyword search: %w", err)
 	}
 
 	byID := map[int64]store.Hit{}
@@ -130,7 +144,7 @@ func (e *Engine) Search(ctx context.Context, question, collectionID string) (Sea
 	fused := askyourdocs.ReciprocalRankFusion([]askyourdocs.RankedList{
 		{Docs: toDocs(vec), Weight: 1},
 		{Docs: toDocs(kw), Weight: 1},
-	}, 60, maxSources)
+	}, 60, n)
 
 	for i, f := range fused {
 		id, _ := strconv.ParseInt(f.Text, 10, 64)
@@ -169,26 +183,10 @@ func (e *Engine) Answer(ctx context.Context, question string, results []Result, 
 	}
 	conf := askyourdocs.RateConfidence(top, fallback)
 
-	var ctxText strings.Builder
-	nums := make([]int, 0, len(used))
-	sort.Ints(used)
-	for _, i := range used {
-		r := results[i]
-		nums = append(nums, r.N)
-		fmt.Fprintf(&ctxText, "[%d] Dokument: %s", r.N, filepath.Base(r.Hit.Path))
-		if p := Pages(r.Hit.Pages); p != "" {
-			fmt.Fprintf(&ctxText, ", Seite %s", p)
-		}
-		if s := firstNonEmpty(r.Hit.Section, r.Hit.Breadcrumb); s != "" {
-			fmt.Fprintf(&ctxText, ", Abschnitt: %s", s)
-		}
-		ctxText.WriteString("\n")
-		ctxText.WriteString(firstNonEmpty(r.Hit.ParentText, r.Hit.Text))
-		ctxText.WriteString("\n\n")
-	}
+	ctxText, nums := sourceContext(results, used)
 
 	opts := askyourdocs.PromptOptions(e.llm, e.llmConfig, map[string]any{
-		"context":  askyourdocs.WrapContext(ctxText.String()),
+		"context":  askyourdocs.WrapContext(ctxText),
 		"question": askyourdocs.SanitizeUntrusted(question),
 	})
 	opts = append(opts, ai.WithStreaming(func(_ context.Context, c *ai.ModelResponseChunk) error {
@@ -202,6 +200,81 @@ func (e *Engine) Answer(ctx context.Context, question string, results []Result, 
 	}
 
 	return Answer{Confidence: conf, Used: nums, Relevant: relevant, Total: len(results), Fallback: fallback}, nil
+}
+
+// sourceContext renders the chosen sources for a prompt, in source order,
+// and returns their numbers.
+func sourceContext(results []Result, used []int) (string, []int) {
+	var b strings.Builder
+	nums := make([]int, 0, len(used))
+	sorted := append([]int(nil), used...)
+	sort.Ints(sorted)
+	for _, i := range sorted {
+		r := results[i]
+		nums = append(nums, r.N)
+		fmt.Fprintf(&b, "[%d] Dokument: %s", r.N, filepath.Base(r.Hit.Path))
+		if p := Pages(r.Hit.Pages); p != "" {
+			fmt.Fprintf(&b, ", Seite %s", p)
+		}
+		if s := firstNonEmpty(r.Hit.Section, r.Hit.Breadcrumb); s != "" {
+			fmt.Fprintf(&b, ", Abschnitt: %s", s)
+		}
+		b.WriteString("\n")
+		b.WriteString(firstNonEmpty(r.Hit.ParentText, r.Hit.Text))
+		b.WriteString("\n\n")
+	}
+	return b.String(), nums
+}
+
+// NothingNew is what the qa_more prompt answers when further sources add
+// nothing.
+const NothingNew = "(nothing new)"
+
+// MoreAnswer is the outcome of AnswerMore.
+type MoreAnswer struct {
+	Text     string // addition to the answer; "" if the sources add nothing
+	Used     []int  // source numbers given to the model
+	Relevant int    // sources rated relevant
+}
+
+// AnswerMore rates further sources of a question and, if any is relevant,
+// writes what they add to the previous answer. previous is cut to its last
+// 6,000 characters to leave room for the sources.
+func (e *Engine) AnswerMore(ctx context.Context, question, previous string, results []Result) (MoreAnswer, error) {
+	if e.llm == nil {
+		return MoreAnswer{}, i18n.Errorf("core.noAnswerModel")
+	}
+	if len(results) == 0 {
+		return MoreAnswer{}, nil
+	}
+	texts := make([]string, len(results))
+	sizes := make([]int, len(results))
+	for i, r := range results {
+		texts[i] = r.Hit.Text
+		sizes[i] = len(firstNonEmpty(r.Hit.ParentText, r.Hit.Text))
+	}
+	scores := askyourdocs.RerankScores(ctx, e.rerank, e.llm, e.llmConfig, question, texts, askyourdocs.RerankOptions{})
+	used, relevant, fallback := selectSources(scores, sizes, contextBudget)
+	if fallback {
+		return MoreAnswer{}, nil
+	}
+	ctxText, nums := sourceContext(results, used)
+	if r := []rune(previous); len(r) > 6000 {
+		previous = "…" + string(r[len(r)-6000:])
+	}
+	resp, err := e.qaMore.Execute(ctx, askyourdocs.PromptOptions(e.llm, e.llmConfig, map[string]any{
+		"context":  askyourdocs.WrapContext(ctxText),
+		"previous": askyourdocs.SanitizeUntrusted(previous),
+		"question": askyourdocs.SanitizeUntrusted(question),
+	})...)
+	if err != nil {
+		return MoreAnswer{}, err
+	}
+	text := strings.TrimSpace(resp.Text())
+	if text == NothingNew || strings.Contains(text, NothingNew) && len(text) < len(NothingNew)+20 {
+		text = ""
+	}
+	return MoreAnswer{Text: text, Used: nums, Relevant: relevant}, nil
 }
 
 // selectSources picks the sources for the answer: every source rated

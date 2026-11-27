@@ -118,6 +118,17 @@ Kleintiere sind erlaubt. Hunde und Katzen nur nach schriftlicher Zustimmung.
 		t.Errorf("answer was not streamed")
 	}
 
+	// The same sources again add nothing to the answer: AnswerMore must not
+	// repeat it.
+	again, err := eng.AnswerMore(ctx, q, text.String(), res.Results)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("AnswerMore with the same sources: %q (relevant %d)", again.Text, again.Relevant)
+	if strings.Contains(strings.ToLower(again.Text), "drei monate") {
+		t.Errorf("AnswerMore repeated the answer: %q", again.Text)
+	}
+
 	// An English question about German documents is answered in English.
 	qEN := "How long is my notice period?"
 	resEN, err := eng.Search(ctx, qEN, "w")
