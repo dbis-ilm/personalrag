@@ -117,7 +117,11 @@ func (s *AppService) Connections() ConnectionSettings {
 	cfg := s.settings
 	s.mu.RUnlock()
 	key, _ := secrets.Get(secrets.GPUStackKey)
-	return ConnectionSettings{OllamaHost: cfg.OllamaHost, GPUStackURL: cfg.GPUStackURL, GPUStackKeySet: key != ""}
+	host := cfg.OllamaHost
+	if cfg.OllamaOff {
+		host = "" // the field shows what the user chose: no Ollama
+	}
+	return ConnectionSettings{OllamaHost: host, GPUStackURL: cfg.GPUStackURL, GPUStackKeySet: key != ""}
 }
 
 // TestConnection checks a provider with the given address (and key) without
@@ -147,7 +151,10 @@ func (s *AppService) RuntimeInfo() RuntimeInfo {
 	defer cancel()
 
 	info := RuntimeInfo{LLM: cfg.LLM, Embedding: cfg.Embedding, RemoteConsent: cfg.RemoteConsent}
-	ollama := probeOllama(ctx, cfg.OllamaHost)
+	ollama := ProviderInfo{ID: providerOllama, Label: "Ollama", Models: []ModelInfo{}}
+	if !cfg.OllamaOff {
+		ollama = probeOllama(ctx, cfg.OllamaHost)
+	}
 	gpu := ProviderInfo{ID: providerGPUStack, Label: "GPUStack", Models: []ModelInfo{}}
 	if cfg.GPUStackURL != "" {
 		key, _ := secrets.Get(secrets.GPUStackKey)
@@ -247,16 +254,26 @@ func prefer(specs []string, wanted ...string) string {
 
 // SaveConnections stores the Ollama address and the GPUStack server. The API
 // key goes to the system keychain, never to settings.json; an empty key
-// keeps the stored one, removeKey deletes it. An empty GPUStack URL turns
-// GPUStack off.
+// keeps the stored one, removeKey deletes it. An empty Ollama address or
+// GPUStack URL turns that provider off; one of them must stay.
 func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string, removeKey bool) error {
-	oh, err := validateURL(ollamaHost)
-	if err != nil {
-		return i18n.Errorf("conn.ollama", err)
-	}
 	s.mu.RLock()
 	cfg := s.settings
 	s.mu.RUnlock()
+
+	ollamaOff := strings.TrimSpace(ollamaHost) == ""
+	oh := cfg.OllamaHost // kept while Ollama is off
+	if ollamaOff {
+		if providerOf(cfg.LLM) == providerOllama || providerOf(cfg.Embedding) == providerOllama {
+			return i18n.Errorf("conn.ollamaInUse")
+		}
+	} else {
+		var err error
+		if oh, err = validateURL(ollamaHost); err != nil {
+			return i18n.Errorf("conn.ollama", err)
+		}
+	}
+	var err error
 
 	gu := strings.TrimSpace(gpustackURL)
 	if gu == "" {
@@ -266,6 +283,9 @@ func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string
 		removeKey = true
 	} else if gu, err = validateURL(gu); err != nil {
 		return i18n.Errorf("conn.gpustack", err)
+	}
+	if ollamaOff && gu == "" {
+		return i18n.Errorf("conn.noProvider")
 	}
 
 	switch {
@@ -279,7 +299,7 @@ func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string
 		}
 	}
 
-	cfg.OllamaHost, cfg.GPUStackURL = oh, gu
+	cfg.OllamaHost, cfg.OllamaOff, cfg.GPUStackURL = oh, ollamaOff, gu
 	if err := s.saveSettings(cfg); err != nil {
 		return err
 	}
@@ -300,7 +320,11 @@ func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote boo
 	s.mu.RUnlock()
 	for _, spec := range []string{llmSpec, embeddingSpec} {
 		switch providerOf(spec) {
-		case "", providerOllama:
+		case "":
+		case providerOllama:
+			if cfg.OllamaOff {
+				return i18n.Errorf("conn.ollamaOff")
+			}
 		case providerGPUStack:
 			if cfg.GPUStackURL == "" {
 				return i18n.Errorf("conn.gpustackMissing")

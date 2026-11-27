@@ -216,6 +216,7 @@ export const de = {
 
   'conn.ollamaAddress': 'Ollama-Adresse',
   'conn.test': 'Testen',
+  'conn.ollamaHint': 'Leer lassen, wenn du nur einen GPUStack-Server nutzt.',
   'conn.addGpu': 'GPUStack-Server verbinden (optional)',
   'conn.notSetUp': 'Nicht eingerichtet',
   'conn.apiUrl': 'API-Adresse',

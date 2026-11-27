@@ -13,7 +13,10 @@ const AppName = "PersonalRAG"
 
 // Settings are persisted as settings.json in the data directory.
 type Settings struct {
-	OllamaHost   string `json:"ollamaHost"`
+	OllamaHost string `json:"ollamaHost"`
+	// OllamaOff: the user left the Ollama address empty and uses another
+	// provider only. OllamaHost keeps the last address for turning it on.
+	OllamaOff    bool   `json:"ollamaOff,omitempty"`
 	LLM          string `json:"llm"`       // model spec, e.g. "ollama/gemma4:12b"; empty = search only
 	Embedding    string `json:"embedding"` // model spec, e.g. "ollama/bge-m3"
 	EmbeddingDim int    `json:"embeddingDim"`
