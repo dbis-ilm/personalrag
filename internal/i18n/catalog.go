@@ -48,7 +48,8 @@ var catalog = map[string]entry{
 	"answer.nothingFound": {"In deinen Dokumenten habe ich dazu nichts gefunden.", "I found nothing about this in your documents."},
 	"answer.noHits":       {"keine Treffer", "no matches"},
 	"answer.fallback":     {"keine Quelle eindeutig relevant", "no source clearly relevant"},
-	"answer.used":         {"%d von %d Treffern als relevant bewertet", "%d of %d matches rated relevant"},
+	"answer.used":         {"%d von %d Treffern verwendet", "%d of %d matches used"},
+	"answer.usedBudget":   {"%d von %d Treffern verwendet; %d weitere relevante waren zu lang für die Antwort", "%d of %d matches used; %d more relevant ones were too long for the answer"},
 	"answer.interrupted":  {"Antwort wurde nicht fertiggestellt (App beendet).", "The answer was not finished (the app was closed)."},
 
 	// Connections and models

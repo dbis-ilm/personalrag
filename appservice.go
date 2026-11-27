@@ -1090,6 +1090,9 @@ func answerNote(a rag.Answer) string {
 	case a.Fallback:
 		return i18n.T("answer.fallback")
 	}
+	if left := a.Relevant - len(a.Used); left > 0 {
+		return i18n.T("answer.usedBudget", len(a.Used), a.Total, left)
+	}
 	return i18n.T("answer.used", len(a.Used), a.Total)
 }
 
