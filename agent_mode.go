@@ -78,7 +78,7 @@ func (s *AppService) Agent(conversationID, task, collectionID string) (AgentStar
 	s.agentRuns[turnID] = cancel
 	s.mu.Unlock()
 
-	prompt := agentPrompt(task, collectionID, s.collectionName(collectionID), earlier)
+	prompt := agentPrompt(task, collectionID, s.collectionName(collectionID), earlier, c.agent.textLocal)
 	go s.runAgent(runCtx, cancel, c, turnID, prompt)
 	return AgentStart{ConversationID: conversationID, TurnID: turnID}, nil
 }
@@ -129,8 +129,11 @@ func (s *AppService) StopAgent(turnID int64) {
 
 // agentPrompt gives the task its context: the collection to stay in and
 // the last turns of the conversation, so follow-ups ("as a table") work.
-func agentPrompt(task, collectionID, collectionName string, earlier []history.Turn) string {
+func agentPrompt(task, collectionID, collectionName string, earlier []history.Turn, textLocal bool) string {
 	var b strings.Builder
+	if textLocal {
+		b.WriteString("Document text stays on the user's computer: there is no read_document, and search_documents tells where passages are but not their text. Read documents only through extract (with pages where you know them).\n\n")
+	}
 	if n := len(earlier); n > 0 {
 		b.WriteString("Earlier in this conversation:\n")
 		for _, t := range earlier[max(0, n-4):] {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -363,5 +364,42 @@ func TestRelativePaths(t *testing.T) {
 		if !strings.HasPrefix(d.Path, "Protokolle/") || strings.Contains(d.Path, os.TempDir()) {
 			t.Errorf("path %q", d.Path)
 		}
+	}
+}
+
+// With TextLocal the agent gets no document text: no read_document, and
+// search says where passages are without their text.
+func TestTextLocal(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	g := genkit.Init(ctx, genkit.WithPromptFS(rag.PromptFS), genkit.WithPromptDir("prompts"))
+	eng, err := rag.New(g, f.st, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	full := New(f.st, eng, "t").InApp()
+	local := full.TextLocal()
+	if full.TextIsLocal() || !local.TextIsLocal() {
+		t.Fatal("TextIsLocal wrong")
+	}
+	var names []string
+	for _, tool := range local.Tools(g) {
+		names = append(names, tool.Name())
+	}
+	if slices.Contains(names, "read_document") || !slices.Contains(names, "extract") || !slices.Contains(names, "search_documents") {
+		t.Fatalf("tools with text kept local: %v", names)
+	}
+
+	out, _, err := local.searchDocuments(ctx, SearchIn{Query: "Anwesend Budget"})
+	if err != nil || len(out.Passages) == 0 {
+		t.Fatalf("search: %+v, %v", out, err)
+	}
+	for _, p := range out.Passages {
+		if p.Text != "" || p.Name == "" || p.DocumentID == 0 {
+			t.Errorf("passage carries text or lacks its place: %+v", p)
+		}
+	}
+	if out, _, _ := full.searchDocuments(ctx, SearchIn{Query: "Anwesend Budget"}); len(out.Passages) == 0 || out.Passages[0].Text == "" {
+		t.Error("full search lost its text")
 	}
 }

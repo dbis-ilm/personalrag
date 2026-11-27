@@ -54,6 +54,7 @@ type RuntimeInfo struct {
 	SuggestedLLM       string         `json:"suggestedLlm"`
 	SuggestedEmbedding string         `json:"suggestedEmbedding"`
 	AgentModel         string         `json:"agentModel"` // configured spec; "" = the answer model
+	AgentTextLocal     bool           `json:"agentTextLocal"`
 	SuggestedAgent     string         `json:"suggestedAgent"`
 	RemoteConsent      string         `json:"remoteConsent"` // host the user agreed to send excerpts to
 }
@@ -164,7 +165,7 @@ func (s *AppService) RuntimeInfo() RuntimeInfo {
 	ctx, cancel := context.WithTimeout(s.appCtx, 8*time.Second)
 	defer cancel()
 
-	info := RuntimeInfo{LLM: cfg.LLM, Embedding: cfg.Embedding, AgentModel: cfg.AgentModel, RemoteConsent: cfg.RemoteConsent}
+	info := RuntimeInfo{LLM: cfg.LLM, Embedding: cfg.Embedding, AgentModel: cfg.AgentModel, AgentTextLocal: cfg.AgentTextLocal, RemoteConsent: cfg.RemoteConsent}
 	ollama := ProviderInfo{ID: providerOllama, Label: "Ollama", Models: []ModelInfo{}}
 	if !cfg.OllamaOff {
 		ollama = probeOllama(ctx, cfg.OllamaHost)
@@ -436,6 +437,20 @@ func (s *AppService) SaveAgentModel(spec string, confirmRemote bool) error {
 		return err
 	}
 	s.restartAsync() // the core registers the agent model
+	return nil
+}
+
+// SaveAgentTextLocal turns "document text stays local" for the agent on or
+// off; the core rebuilds the agent's tools.
+func (s *AppService) SaveAgentTextLocal(on bool) error {
+	s.mu.RLock()
+	cfg := s.settings
+	s.mu.RUnlock()
+	cfg.AgentTextLocal = on
+	if err := s.saveSettings(cfg); err != nil {
+		return err
+	}
+	s.restartAsync()
 	return nil
 }
 

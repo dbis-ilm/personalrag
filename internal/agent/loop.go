@@ -104,16 +104,36 @@ func (s *Server) InApp() *Server {
 	return &c
 }
 
+// TextLocal returns a server whose results carry no document text: no
+// read_document, and search returns where passages are, not their text.
+// Text is then read only by extract, i.e. by the answer model; with a local
+// answer model and a remote agent model, document text stays here.
+func (s *Server) TextLocal() *Server {
+	c := *s
+	c.noText = true
+	return &c
+}
+
+// TextIsLocal reports whether the server keeps document text out of its
+// results.
+func (s *Server) TextIsLocal() bool { return s.noText }
+
 // Tools registers the agent's tools on g (once per Genkit instance).
 func (s *Server) Tools(g *genkit.Genkit) []ai.ToolRef {
-	return []ai.ToolRef{
+	search := "Hybrid search over the documents; returns the most relevant passages with document id, name, pages and text. Use it to find where something is, not to cover everything."
+	if s.noText {
+		search = "Hybrid search over the documents; returns where the most relevant passages are (document id, name, pages, section) without their text, which stays on the user's computer. Then use extract on those documents (and pages) to get what you need."
+	}
+	tools := []ai.ToolRef{
 		defineTool(g, s, "list_collections", "Lists the document collections with their ids.", s.listCollections),
 		defineTool(g, s, "list_documents", "Lists documents (id, name, format, pages, status), filterable by collection, folder, format and modification date, paged. Use it to cover every document of a collection.", s.listDocuments),
-		defineTool(g, s, "read_document", "Returns the text of one document, paged by characters, with [Page n] markers; optionally only some pages.", s.readDocument),
-		defineTool(g, s, "search_documents", "Hybrid search over the documents; returns the most relevant passages with document id, name and pages. Use it to find where something is, not to cover everything.", s.searchDocuments),
+		defineTool(g, s, "search_documents", search, s.searchDocuments),
 		defineTool(g, s, "extract", "Runs an instruction over one document with the local model and returns only the result per part, e.g. 'list the names under Anwesend, one per line'. Prefer it over reading long documents. pages limits it to part of the document, stop_after_match ends it at the first part with a result. Without them it reads the whole document: slow, and text elsewhere that merely resembles what is asked can produce false results.", s.extract),
-		genkit.DefineTool(g, "calc", "Runs Starlark (a Python dialect: lists, dicts, loops, functions, sorted, len, str methods; json.decode/encode) to count, sum, sort or build tables exactly. The results of all earlier tool calls are in the list `outputs`, in call order; each is a dict with keys tool, input, document and text (for extract: the extracted lines; for read_document: the text). Work on outputs instead of retyping data. print() output and the variable `result` are returned. No files, no network.", calcTool),
 	}
+	if !s.noText {
+		tools = append(tools, defineTool(g, s, "read_document", "Returns the text of one document, paged by characters, with [Page n] markers; optionally only some pages.", s.readDocument))
+	}
+	return append(tools, genkit.DefineTool(g, "calc", "Runs Starlark (a Python dialect: lists, dicts, loops, functions, sorted, len, str methods; json.decode/encode) to count, sum, sort or build tables exactly. The results of all earlier tool calls are in the list `outputs`, in call order; each is a dict with keys tool, input, document and text (for extract: the extracted lines; for read_document: the text). Work on outputs instead of retyping data. print() output and the variable `result` are returned. No files, no network.", calcTool))
 }
 
 // ToolResult wraps a tool's output for the agent. A failing call (e.g. a
