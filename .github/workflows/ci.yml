@@ -16,13 +16,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+
+      # Wails on Linux links GTK 4 and WebKitGTK 6.0 through cgo.
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
 
       - uses: actions/setup-go@v5
         with:
@@ -54,13 +61,13 @@ jobs:
       - name: Go vet
         run: go vet ./...
 
-      # The race detector needs cgo, which the macOS runner has out of the box.
+      # The race detector needs cgo: built in on macOS, installed above on Linux.
       - name: Go tests (race)
-        if: runner.os == 'macOS'
+        if: runner.os != 'Windows'
         run: go test -race ./...
 
       - name: Go tests
-        if: runner.os != 'macOS'
+        if: runner.os == 'Windows'
         run: go test ./...
 
       - name: Build app

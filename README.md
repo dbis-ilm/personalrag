@@ -6,7 +6,7 @@ PersonalRAG is a desktop app for macOS and Windows that answers questions about 
 
 It is built with [Wails v3](https://v3.wails.io) (Go backend, React/TypeScript UI) on top of the [askyourdocs](https://github.com/dbis-ilm/askyourdocs) RAG library.
 
-> **Status: early development.** The app works on macOS (Apple Silicon) for daily use. It builds for Windows 10/11 (x64) but has not been tested on Windows hardware yet. There are no signed releases yet; build it from source (see below).
+> **Status: early development.** The app works on macOS (Apple Silicon) for daily use. It builds and passes its tests on Windows 10/11 (x64) and Ubuntu 24.04 in CI, but has not been tested on Windows or Linux desktops yet; Linux (Ubuntu with GNOME) is experimental. There are no signed releases yet; build it from source (see below).
 
 ## Features
 
@@ -25,7 +25,7 @@ Planned next: a file system watcher, OCR, MCP over HTTP for the running app, sig
 
 To run:
 
-- macOS on Apple Silicon (developed and tested on macOS 27), or Windows 10/11 (x64, untested so far)
+- macOS on Apple Silicon (developed and tested on macOS 27), Windows 10/11 (x64, untested so far), or Ubuntu 24.04 with GNOME (experimental)
 - **Either** [Ollama](https://ollama.com) with an embedding model and, optionally, a chat model:
 
   ```sh
@@ -40,6 +40,7 @@ To build:
 - Go 1.26 or later
 - Node.js 20 or later
 - Wails CLI v3.1.0: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0` (make sure `$(go env GOPATH)/bin` is on your `PATH`)
+- Linux: a C compiler and the GTK 4 and WebKitGTK 6.0 development packages (`sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev`); Wails needs cgo there, so Linux builds run on Linux, not cross-compiled
 - macOS: Xcode command line tools; Xcode itself when regenerating the icon (`actool` builds the macOS 26 `Assets.car`)
 
 ## Build and run
@@ -166,7 +167,7 @@ The end-to-end tests use `PERSONALRAG_EMBED` (default `bge-m3`) and `PERSONALRAG
 
 After changing exported methods or types of the bound services, regenerate the TypeScript bindings with `wails3 generate bindings -ts` (`wails3 build` does this as well).
 
-CI (`.github/workflows/ci.yml`) runs on macOS and Windows: frontend type check and build, `go vet`, Go tests (with the race detector on macOS) and `wails3 build`.
+CI (`.github/workflows/ci.yml`) runs on macOS, Windows and Ubuntu 24.04: frontend type check and build, `go vet`, Go tests (with the race detector on macOS and Linux) and `wails3 build`.
 
 To change the icon, edit the SVGs in `build/icon-src`, render `build/appicon.png` from `appicon.svg` (1024 × 1024) and run `wails3 generate icons` as in `build/Taskfile.yml` (`common:generate:icons`).
 
