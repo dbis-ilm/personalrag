@@ -52,13 +52,13 @@ func TestGPUStackClient(t *testing.T) {
 	if err != nil || strings.Join(models, ",") != "qwen3-8b,bge-m3" {
 		t.Fatalf("models = %v, %v", models, err)
 	}
-	if _, err := GPUStackModels(ctx, base, "wrong"); err == nil || !strings.Contains(err.Error(), "API-Schlüssel abgelehnt") {
+	if _, err := GPUStackModels(ctx, base, "wrong"); err == nil || !strings.Contains(err.Error(), "API key rejected") {
 		t.Fatalf("wrong key: %v", err)
 	}
 	if dim, err := GPUStackEmbeddingDim(ctx, base, "sk-test", "bge-m3"); err != nil || dim != 4 {
 		t.Fatalf("dim = %d, %v", dim, err)
 	}
-	if _, err := GPUStackEmbeddingDim(ctx, base, "sk-test", "qwen3-8b"); err == nil || !strings.Contains(err.Error(), "kein Embedding-Modell") {
+	if _, err := GPUStackEmbeddingDim(ctx, base, "sk-test", "qwen3-8b"); err == nil || !strings.Contains(err.Error(), "not an embedding model") {
 		t.Fatalf("chat model as embedder: %v", err)
 	}
 }

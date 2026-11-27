@@ -20,7 +20,7 @@ type Step struct {
 }
 
 // ErrTooNew means the database was written by a newer app version.
-var ErrTooNew = errors.New("Der Index stammt von einer neueren App-Version")
+var ErrTooNew = errors.New("the index was written by a newer version of PersonalRAG")
 
 // Options tune Apply.
 type Options struct {
@@ -58,14 +58,14 @@ func Apply(ctx context.Context, db *sql.DB, component string, steps []Step, opts
 	}
 	latest := len(steps)
 	if current > latest {
-		return fmt.Errorf("%w (%s: Version %d, diese App kennt %d)", ErrTooNew, component, current, latest)
+		return fmt.Errorf("%w (%s: version %d, this app knows %d)", ErrTooNew, component, current, latest)
 	}
 	if current == latest {
 		return nil
 	}
 	if current > 0 && opts.BackupPath != "" {
 		if err := backup(ctx, db, opts.BackupPath); err != nil {
-			return fmt.Errorf("migrate %s: Sicherung vor der Migration: %w", component, err)
+			return fmt.Errorf("migrate %s: backup before migrating: %w", component, err)
 		}
 		slog.Info("schema backup written", "component", component, "path", opts.BackupPath)
 	}

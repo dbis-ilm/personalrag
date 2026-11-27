@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/dbis-ilm/askyourdocs"
 
+	"github.com/dbis-ilm/personalrag/internal/i18n"
 	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
@@ -53,10 +55,10 @@ func SkipFile(name string) bool {
 // the wildcards of filepath.Match (* ? [..]); no path separators.
 func ValidatePattern(p string) error {
 	if strings.ContainsAny(p, `/\`) {
-		return fmt.Errorf("%q: nur Datei- oder Ordnernamen, keine Pfade", p)
+		return i18n.Errorf("exclusions.notName", p)
 	}
 	if _, err := filepath.Match(p, ""); err != nil {
-		return fmt.Errorf("%q ist kein gültiges Muster", p)
+		return i18n.Errorf("exclusions.invalid", p)
 	}
 	return nil
 }
@@ -88,7 +90,7 @@ func HashFile(path string) (string, error) {
 }
 
 // ErrNeedsOCR marks a PDF without a text layer.
-var ErrNeedsOCR = fmt.Errorf("keine Textebene erkannt")
+var ErrNeedsOCR = errors.New("no text layer (scanned document)")
 
 // Extract returns a file's paragraphs. Scanned PDFs return ErrNeedsOCR.
 func Extract(path string) ([]askyourdocs.Paragraph, error) {
@@ -114,7 +116,7 @@ func Extract(path string) ([]askyourdocs.Paragraph, error) {
 	case ".txt":
 		return extractText(path, false)
 	}
-	return nil, fmt.Errorf("nicht unterstütztes Format: %s", filepath.Ext(path))
+	return nil, fmt.Errorf("unsupported format: %s", filepath.Ext(path))
 }
 
 // extractText splits plain text or Markdown into paragraphs at blank lines.
@@ -232,7 +234,7 @@ func (s *FileSource) DeleteStale(ctx context.Context, vs askyourdocs.VectorStore
 }
 
 // PlainText renders paragraphs as readable text for an agent: paragraphs
-// separated by blank lines, headings as Markdown headings, and a "[Seite n]"
+// separated by blank lines, headings as Markdown headings, and a "[Page n]"
 // marker wherever the page changes (paged formats only).
 func PlainText(paras []askyourdocs.Paragraph) string {
 	var b strings.Builder
@@ -247,7 +249,7 @@ func PlainText(paras []askyourdocs.Paragraph) string {
 			if b.Len() > 0 {
 				b.WriteString("\n\n")
 			}
-			fmt.Fprintf(&b, "[Seite %d]", page)
+			fmt.Fprintf(&b, "[Page %d]", page)
 		}
 		if b.Len() > 0 {
 			b.WriteString("\n\n")

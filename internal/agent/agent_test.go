@@ -22,7 +22,7 @@ import (
 )
 
 // fakeModel answers the extract prompt with the names after "Anwesend:" in
-// the document part, or "(nichts gefunden)". Enough to test the plumbing
+// the document part, or "(nothing found)". Enough to test the plumbing
 // without a real model.
 // modelCalls counts calls of the fake model, to see the cache work.
 var modelCalls atomic.Int64
@@ -175,7 +175,7 @@ func TestToolsAndSharing(t *testing.T) {
 	if len(page.Documents) != 2 || page.NextOffset != 2 {
 		t.Fatalf("paging: %+v", page)
 	}
-	if msg := f.call(t, "list_documents", map[string]any{"collection_id": "privat"}, nil); !strings.Contains(msg, "nicht für Agenten freigegeben") {
+	if msg := f.call(t, "list_documents", map[string]any{"collection_id": "privat"}, nil); !strings.Contains(msg, "not shared with agents") {
 		t.Fatalf("private collection: %q", msg)
 	}
 
@@ -190,7 +190,7 @@ func TestToolsAndSharing(t *testing.T) {
 		t.Fatalf("read paging: %+v", part)
 	}
 	// A private document looks like a missing one.
-	if msg := f.call(t, "read_document", map[string]any{"document_id": f.ids["geheim.md"]}, nil); !strings.Contains(msg, "nicht gefunden") {
+	if msg := f.call(t, "read_document", map[string]any{"document_id": f.ids["geheim.md"]}, nil); !strings.Contains(msg, "not found") {
 		t.Fatalf("private document readable: %q", msg)
 	}
 
@@ -253,7 +253,7 @@ func TestCountParticipants(t *testing.T) {
 	if strings.Join(got, " ") != "Anna Berg=3 Carl Dorn=2 Eva Fuchs=2" {
 		t.Fatalf("counts = %v", got)
 	}
-	if msg := f.call(t, "extract", map[string]any{"document_id": f.ids["geheim.md"], "instruction": "x"}, nil); !strings.Contains(msg, "nicht gefunden") {
+	if msg := f.call(t, "extract", map[string]any{"document_id": f.ids["geheim.md"], "instruction": "x"}, nil); !strings.Contains(msg, "not found") {
 		t.Fatalf("extract on private document: %q", msg)
 	}
 }
@@ -311,21 +311,21 @@ func TestExtractPagesStopAndCache(t *testing.T) {
 		t.Fatalf("stop_after_match: %+v", stop)
 	}
 
-	if msg := f.call(t, "extract", map[string]any{"document_id": id, "instruction": instr, "pages": "9"}, nil); !strings.Contains(msg, "das Dokument hat 3 Seiten") {
+	if msg := f.call(t, "extract", map[string]any{"document_id": id, "instruction": instr, "pages": "9"}, nil); !strings.Contains(msg, "the document has 3 pages") {
 		t.Fatalf("missing page: %q", msg)
 	}
-	if msg := f.call(t, "extract", map[string]any{"document_id": id, "instruction": instr, "pages": "zwei"}, nil); !strings.Contains(msg, "Seitenangabe") {
+	if msg := f.call(t, "extract", map[string]any{"document_id": id, "instruction": instr, "pages": "zwei"}, nil); !strings.Contains(msg, "expected e.g.") {
 		t.Fatalf("bad pages: %q", msg)
 	}
 
 	var read ReadDocumentOut
 	f.call(t, "read_document", map[string]any{"document_id": id, "pages": "2"}, &read)
-	if !strings.Contains(read.Text, "Haushalt") || strings.Contains(read.Text, "Anwesend") || !strings.HasPrefix(read.Text, "[Seite 2]") {
+	if !strings.Contains(read.Text, "Haushalt") || strings.Contains(read.Text, "Anwesend") || !strings.HasPrefix(read.Text, "[Page 2]") {
 		t.Fatalf("read pages 2: %q", read.Text)
 	}
 	var md ExtractOut
 	f.call(t, "extract", map[string]any{"document_id": f.ids["sitzung-1.md"], "instruction": instr, "pages": "1"}, &md)
-	if !strings.Contains(md.Note, "keine Seiten") || !md.Found {
+	if !strings.Contains(md.Note, "has no pages") || !md.Found {
 		t.Fatalf("pages on Markdown: %+v", md)
 	}
 

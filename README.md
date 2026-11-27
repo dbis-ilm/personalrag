@@ -17,6 +17,7 @@ It is built with [Wails v3](https://v3.wails.io) (Go backend, React/TypeScript U
 - **Conversations:** follow-up questions are rewritten into standalone questions before searching. Conversations are stored locally with a snapshot of the cited passages, so they reopen exactly as answered.
 - **Local by default:** Ollama on this machine for embeddings and answers. Alternatively an OpenAI-compatible server such as [GPUStack](https://github.com/gpustack/gpustack), LM Studio or llama.cpp, by URL and API key. A server that is not on this machine requires your explicit consent before any excerpt is sent to it.
 - **Agents (MCP):** OpenCode, Claude Desktop, Claude Code, Cursor and other MCP clients can list, read, search and extract from the collections you share, read-only. Every call is logged in the app. See [Using PersonalRAG with agents](#using-personalrag-with-agents).
+- **English and German:** the UI follows the system language and can be switched in Settings. Answers come in the language of the question, whatever language the documents are in. Texts for agents (MCP) are always English.
 - **Desktop behaviour:** runs in the menu bar / notification area, closing the window keeps indexing, one instance per data directory, light and dark mode.
 
 Planned next: a file system watcher, OCR, MCP over HTTP for the running app, signed installers. See [Roadmap](#roadmap).
@@ -79,7 +80,7 @@ A cross-build only compiles; the Go tests do not run on Windows. For an installe
 - PersonalRAG never modifies your documents. The index holds text excerpts of them in plain text, protected like the rest of your user profile.
 - With Ollama, nothing leaves your machine. With a model on another server, questions and excerpts are sent there; the app asks for consent per server and shows the server in the sidebar while it is in use.
 - The log rotates at 5 MB and keeps three older files. Questions and document text are logged only at level `debug`. Crashes are written to `logs/crash*.log` and reported on the next start.
-- Settings › Diagnose shows a diagnostic report (versions, settings, index statistics, last log lines, home directory replaced by `~`) before you copy it into a bug report.
+- Settings › Diagnostics shows a diagnostic report (versions, settings, index statistics, last log lines, home directory replaced by `~`) before you copy it into a bug report.
 
 Environment variables:
 
@@ -87,6 +88,7 @@ Environment variables:
 | --- | --- |
 | `PERSONALRAG_DATA` | Use another data directory, e.g. for testing. Each data directory has its own single-instance lock. |
 | `PERSONALRAG_LOG_LEVEL` | `debug`, `info`, `warn` or `error`; overrides the setting. |
+| `PERSONALRAG_LANG` | `de` or `en`; used instead of the system language when Settings say “Same as system”. |
 
 ## Using PersonalRAG with agents
 
@@ -113,7 +115,7 @@ Claude Code: `claude mcp add personalrag -- /Applications/PersonalRAG.app/Conten
 | --- | --- |
 | `list_collections` | Shared collections and their document counts |
 | `list_documents` | Every document of the shared collections, filterable by collection, folder, format and date, paged. Includes documents that could not be read (e.g. scans needing OCR), so an evaluation can report what it did not cover |
-| `read_document` | Full text of one document, paged by characters, with `[Seite n]` page markers; optionally only some pages (`pages: "1-2"`) |
+| `read_document` | Full text of one document, paged by characters, with `[Page n]` page markers; optionally only some pages (`pages: "1-2"`) |
 | `search_documents` | Hybrid search; returns the most relevant passages, not all matches |
 | `extract` | Applies an instruction to a document with *your* model (e.g. "list the names under Anwesend") and returns only the result. `pages` limits it to where the information is, `stop_after_match` ends at the first part with a match. Results are cached per document version, model and instruction |
 

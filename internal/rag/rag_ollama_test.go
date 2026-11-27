@@ -107,7 +107,7 @@ Kleintiere sind erlaubt. Hunde und Katzen nur nach schriftlicher Zustimmung.
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("answer (%d chunks, confidence %s, %s): %s", chunks, ans.Confidence, ans.Note, text.String())
+	t.Logf("answer (%d chunks, confidence %s, %d of %d sources used): %s", chunks, ans.Confidence, len(ans.Used), ans.Total, text.String())
 	if !strings.Contains(strings.ToLower(text.String()), "drei monate") {
 		t.Errorf("answer misses the fact")
 	}
@@ -116,6 +116,21 @@ Kleintiere sind erlaubt. Hunde und Katzen nur nach schriftlicher Zustimmung.
 	}
 	if chunks < 2 {
 		t.Errorf("answer was not streamed")
+	}
+
+	// An English question about German documents is answered in English.
+	qEN := "How long is my notice period?"
+	resEN, err := eng.Search(ctx, qEN, "w")
+	if err != nil || len(resEN.Results) == 0 {
+		t.Fatalf("search (en): %v, %d results", err, len(resEN.Results))
+	}
+	var textEN strings.Builder
+	if _, err := eng.Answer(ctx, qEN, resEN.Results, func(s string) { textEN.WriteString(s) }); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("answer (en): %s", textEN.String())
+	if low := strings.ToLower(textEN.String()); !strings.Contains(low, "three months") && !strings.Contains(low, "3 months") {
+		t.Errorf("English question not answered in English")
 	}
 }
 

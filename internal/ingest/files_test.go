@@ -72,7 +72,7 @@ func TestPlainTextAndSplit(t *testing.T) {
 		{Text: "Beschluss", PageNum: 2},
 	}
 	got := PlainText(paras)
-	want := "[Seite 1]\n\n## Protokoll\n\nAnwesend: A, B\n\n[Seite 2]\n\nBeschluss"
+	want := "[Page 1]\n\n## Protokoll\n\nAnwesend: A, B\n\n[Page 2]\n\nBeschluss"
 	if got != want {
 		t.Fatalf("PlainText = %q, want %q", got, want)
 	}

@@ -18,6 +18,7 @@ import (
 
 	"github.com/dbis-ilm/askyourdocs"
 
+	"github.com/dbis-ilm/personalrag/internal/i18n"
 	"github.com/dbis-ilm/personalrag/internal/store"
 )
 
@@ -48,9 +49,10 @@ type Search struct {
 
 // Answer summarises a finished answer.
 type Answer struct {
-	Confidence string // "hoch" | "mittel" | "niedrig"
-	Note       string
-	Used       []int // source numbers given to the model
+	Confidence askyourdocs.Confidence // high | medium | low
+	Used       []int                  // source numbers given to the model
+	Total      int                    // sources ranked
+	Fallback   bool                   // no source was clearly relevant
 }
 
 type Engine struct {
@@ -138,11 +140,11 @@ func (e *Engine) Search(ctx context.Context, question, collectionID string) (Sea
 // that cites them by their numbers. onText receives text as it arrives.
 func (e *Engine) Answer(ctx context.Context, question string, results []Result, onText func(string)) (Answer, error) {
 	if e.llm == nil {
-		return Answer{}, errors.New("kein Antwortmodell konfiguriert")
+		return Answer{}, i18n.Errorf("core.noAnswerModel")
 	}
 	if len(results) == 0 {
-		onText("In deinen Dokumenten habe ich dazu nichts gefunden.")
-		return Answer{Confidence: askyourdocs.GermanConfidence(askyourdocs.ConfidenceLow), Note: "keine Treffer"}, nil
+		onText(i18n.T("answer.nothingFound"))
+		return Answer{Confidence: askyourdocs.ConfidenceLow}, nil
 	}
 
 	texts := make([]string, len(results))
@@ -201,11 +203,7 @@ func (e *Engine) Answer(ctx context.Context, question string, results []Result, 
 		return Answer{}, err
 	}
 
-	note := fmt.Sprintf("%d von %d Treffern als relevant bewertet", len(used), len(results))
-	if fallback {
-		note = "keine Quelle eindeutig relevant"
-	}
-	return Answer{Confidence: askyourdocs.GermanConfidence(conf), Note: note, Used: nums}, nil
+	return Answer{Confidence: conf, Used: nums, Total: len(results), Fallback: fallback}, nil
 }
 
 // Pages normalises a chunk's page range; non-paged formats report "0" or "1".
@@ -226,7 +224,13 @@ func firstNonEmpty(s ...string) string {
 }
 
 // NothingFound is what the extract prompt answers for a part without a match.
-const NothingFound = "(nichts gefunden)"
+const NothingFound = "(nothing found)"
+
+// IsNothingFound also accepts the German marker of results cached before
+// the marker became English.
+func IsNothingFound(s string) bool {
+	return s == NothingFound || s == "(nichts gefunden)"
+}
 
 // ModelName identifies the answer model, e.g. for cache keys; "" without one.
 func (e *Engine) ModelName() string {

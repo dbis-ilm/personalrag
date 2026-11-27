@@ -17,6 +17,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/dbis-ilm/personalrag/internal/config"
+	"github.com/dbis-ilm/personalrag/internal/i18n"
 	"github.com/dbis-ilm/personalrag/internal/logging"
 )
 
@@ -53,7 +54,7 @@ func init() {
 func main() {
 	dataDir, err := config.DataDir()
 	if err != nil {
-		log.Fatalf("Datenverzeichnis: %v", err)
+		log.Fatalf("data directory: %v", err)
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "--mcp" {
@@ -63,6 +64,7 @@ func main() {
 	// Logging first, so Genkit and Wails write to the same file.
 	// PERSONALRAG_LOG_LEVEL overrides the level from the settings.
 	settings, _ := config.Load(dataDir)
+	i18n.Set(i18n.Resolve(settings.Language)) // before the tray menu is built
 	level := settings.LogLevel
 	if env := os.Getenv("PERSONALRAG_LOG_LEVEL"); env != "" {
 		level = env
@@ -72,7 +74,7 @@ func main() {
 		logs, err = logging.Setup(dataDir, "info")
 	}
 	if err != nil {
-		log.Fatalf("Protokoll: %v", err)
+		log.Fatalf("log: %v", err)
 	}
 	defer logs.Close()
 	slog.Info("starting", "version", version, "os", runtime.GOOS, "arch", runtime.GOARCH)
@@ -96,7 +98,7 @@ func main() {
 	app := application.New(application.Options{
 		SingleInstance: singleInstance,
 		Name:           "PersonalRAG",
-		Description:    "Lokale Dokumentensuche mit belegten Antworten",
+		Description:    "Local document search with cited answers",
 		Icon:           appIcon,
 		Logger:         logs.Logger(slog.LevelWarn), // Wails logs each asset request at info
 		// Panics in bound methods and Wails goroutines are logged with their
@@ -161,14 +163,20 @@ func main() {
 	tray.SetTooltip("PersonalRAG")
 
 	menu := app.NewMenu()
-	menu.Add("PersonalRAG öffnen").OnClick(func(*application.Context) { showWindow() })
+	openItem := menu.Add(i18n.T("tray.open")).OnClick(func(*application.Context) { showWindow() })
 	menu.AddSeparator()
-	menu.AddCheckbox("Indexierung pausieren", false).OnClick(func(ctx *application.Context) {
+	pauseItem := menu.AddCheckbox(i18n.T("tray.pause"), false).OnClick(func(ctx *application.Context) {
 		svc.SetIndexPaused(ctx.ClickedMenuItem().Checked())
 	})
 	menu.AddSeparator()
-	menu.Add("Beenden").OnClick(func(*application.Context) { app.Quit() })
+	quitItem := menu.Add(i18n.T("tray.quit")).OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
+	svc.onLanguageChange(func() {
+		openItem.SetLabel(i18n.T("tray.open"))
+		pauseItem.SetLabel(i18n.T("tray.pause"))
+		quitItem.SetLabel(i18n.T("tray.quit"))
+		menu.Update()
+	})
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
@@ -205,7 +213,7 @@ func runMCP(dataDir string) int {
 	defer svc.ServiceShutdown()
 	srv, err := svc.AgentServer()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "PersonalRAG ist nicht bereit:", err)
+		fmt.Fprintln(os.Stderr, "PersonalRAG is not ready:", err)
 		return 1
 	}
 	if err := srv.MCP().Run(ctx, &mcp.StdioTransport{}); err != nil && ctx.Err() == nil {

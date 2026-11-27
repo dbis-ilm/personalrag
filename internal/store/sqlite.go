@@ -546,7 +546,7 @@ func (s *Store) SetCollectionShared(ctx context.Context, id string, shared bool)
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("unbekannte Sammlung %q", id)
+		return fmt.Errorf("unknown collection %q", id)
 	}
 	return nil
 }

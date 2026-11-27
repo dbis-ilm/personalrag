@@ -4,6 +4,7 @@ import { AppService, Source, Turn } from '../../bindings/github.com/dbis-ilm/per
 import Icon from '../components/Icon'
 import { toast } from '../components/Toasts'
 import { errorText } from '../App'
+import { fmtNumber, note, t } from '../i18n'
 
 type Mode = 'answer' | 'search'
 
@@ -11,7 +12,7 @@ type Mode = 'answer' | 'search'
 type TurnView = Omit<Turn, 'sources'> & { sources: Source[]; searching?: boolean; streaming?: boolean; notice?: string; millis?: number }
 
 const isMac = document.documentElement.classList.contains('platform-mac')
-const MOD = isMac ? '⌘' : 'Strg'
+const mod = () => (isMac ? '⌘' : t('common.ctrl'))
 const narrow = () => window.matchMedia('(max-width: 1180px)').matches
 
 export default function AskView({
@@ -176,15 +177,16 @@ export default function AskView({
   const activeTurn = turns[active.turn]
   const current: Source | undefined = activeTurn?.sources[active.src]
   const terms = queryTerms(activeTurn ? `${activeTurn.question} ${activeTurn.standalone}` : '')
+  const MOD = mod()
 
   return (
     <>
       <main className="ask">
         <div className="ask-bar">
           <span className="scope-chip">
-            {scopeId ? <>Suche in: {scopeName}</> : <>Suche in: allen Sammlungen</>}
+            {scopeId ? t('ask.scopeIn', { name: scopeName }) : t('ask.scopeAll')}
             {scopeId && (
-              <button type="button" aria-label="Sammlungsfilter entfernen" onClick={onClearScope} className="chip-x">
+              <button type="button" aria-label={t('ask.clearScope')} onClick={onClearScope} className="chip-x">
                 <Icon name="close" size={12} strokeWidth={2.4} />
               </button>
             )}
@@ -192,25 +194,25 @@ export default function AskView({
           <div style={{ flex: 1 }} />
           {conversationId && (
             <>
-              <button type="button" className="btn" onClick={() => onConversation('', scopeId)} title={`Neue Unterhaltung (${MOD} N)`}>
-                <Icon name="plus" size={14} strokeWidth={2.2} />Neu
+              <button type="button" className="btn" onClick={() => onConversation('', scopeId)} title={`${t('app.newConversation')} (${MOD} N)`}>
+                <Icon name="plus" size={14} strokeWidth={2.2} />{t('ask.new')}
               </button>
               <button
                 type="button" className={`btn${confirmDelete ? ' btn-danger' : ' btn-icon'}`} onClick={removeConversation} onBlur={() => setConfirmDelete(false)}
-                aria-label="Unterhaltung löschen"
+                aria-label={t('ask.delete')}
               >
-                {confirmDelete ? 'Wirklich löschen?' : <Icon name="trash" size={14} />}
+                {confirmDelete ? t('ask.confirmDelete') : <Icon name="trash" size={14} />}
               </button>
             </>
           )}
-          <div className="segmented" role="group" aria-label="Modus">
-            <button type="button" aria-pressed={mode === 'answer'} disabled={searchOnly} title={searchOnly ? 'Kein Antwortmodell eingerichtet' : undefined} onClick={() => setMode('answer')}>Antwort</button>
-            <button type="button" aria-pressed={mode === 'search'} onClick={() => setMode('search')}>Nur Suche</button>
+          <div className="segmented" role="group" aria-label={t('ask.mode')}>
+            <button type="button" aria-pressed={mode === 'answer'} disabled={searchOnly} title={searchOnly ? t('ask.noAnswerModel') : undefined} onClick={() => setMode('answer')}>{t('ask.answer')}</button>
+            <button type="button" aria-pressed={mode === 'search'} onClick={() => setMode('search')}>{t('ask.searchOnly')}</button>
           </div>
           <button
             type="button" className="btn btn-icon" aria-controls="source-panel" aria-expanded={previewOpen}
-            aria-label={previewOpen ? 'Quellenfenster ausblenden' : 'Quellenfenster einblenden'}
-            title={`${previewOpen ? 'Quellenfenster ausblenden' : 'Quellenfenster einblenden'} (${MOD} J)`}
+            aria-label={previewOpen ? t('ask.hidePanel') : t('ask.showPanel')}
+            title={`${previewOpen ? t('ask.hidePanel') : t('ask.showPanel')} (${MOD} J)`}
             onClick={() => setPreviewOpen(!previewOpen)}
           >
             <Icon name={previewOpen ? 'panelClose' : 'panelOpen'} size={16} />
@@ -223,41 +225,41 @@ export default function AskView({
               <div className="empty">
                 {hasCollections ? (
                   <>
-                    <h1 className="question">Was möchtest du in deinen Dokumenten nachsehen?</h1>
-                    <p className="lead">Antworten nennen immer ihre Quellen. Unterhaltungen werden lokal gespeichert. {searchOnly ? 'Ohne Antwortmodell siehst du die passenden Fundstellen.' : `Mit ${MOD} K wechselst du in den reinen Suchmodus.`}</p>
+                    <h1 className="question">{t('ask.emptyTitle')}</h1>
+                    <p className="lead">{t('ask.emptyLead')} {searchOnly ? t('ask.emptySearchOnly') : t('ask.emptyToggle', { key: MOD })}</p>
                   </>
                 ) : (
                   <>
-                    <h1 className="question">Noch keine Dokumente</h1>
-                    <p className="lead">Füge einen Ordner hinzu. PersonalRAG indexiert ihn lokal und hält ihn aktuell.</p>
+                    <h1 className="question">{t('ask.noDocsTitle')}</h1>
+                    <p className="lead">{t('ask.noDocsLead')}</p>
                     <button type="button" className="btn btn-primary" style={{ minHeight: 38 }} onClick={onAddFolder}>
-                      <Icon name="plus" size={14} strokeWidth={2.2} />Ordner hinzufügen
+                      <Icon name="plus" size={14} strokeWidth={2.2} />{t('common.addFolder')}
                     </button>
                   </>
                 )}
               </div>
             )}
 
-            {turns.map((t, ti) => (
-              <article key={t.id} className="turn" aria-label={`Frage ${ti + 1}`}>
-                <h1 className={ti === 0 ? 'question' : 'question followup'}>{t.question}</h1>
-                {t.standalone && <div className="meta-line">Gesucht nach: „{t.standalone}“</div>}
+            {turns.map((turn, ti) => (
+              <article key={turn.id} className="turn" aria-label={t('ask.turn', { n: ti + 1 })}>
+                <h1 className={ti === 0 ? 'question' : 'question followup'}>{turn.question}</h1>
+                {turn.standalone && <div className="meta-line">{t('ask.searchedFor', { q: turn.standalone })}</div>}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div className="meta-line">
                     <Icon name="search" size={13} strokeWidth={2} />
-                    {t.searching
-                      ? <span>Suche läuft …</span>
-                      : <span>{t.sources.length} Treffer{t.millis !== undefined && ` · ${(t.millis / 1000).toFixed(2).replace('.', ',')} s`}</span>}
+                    {turn.searching
+                      ? <span>{t('ask.searching')}</span>
+                      : <span>{t('ask.hits', { count: turn.sources.length })}{turn.millis !== undefined && ` · ${fmtNumber(turn.millis / 1000, 2)} s`}</span>}
                   </div>
-                  {t.notice && <div className="inline-note"><Icon name="alert" size={13} strokeWidth={2.2} />{t.notice}</div>}
-                  {!t.searching && t.sources.length === 0 && !t.error && (
-                    <p className="lead">Keine passenden Stellen gefunden. Versuche andere Begriffe oder eine andere Sammlung.</p>
+                  {turn.notice && <div className="inline-note"><Icon name="alert" size={13} strokeWidth={2.2} />{turn.notice}</div>}
+                  {!turn.searching && turn.sources.length === 0 && !turn.error && (
+                    <p className="lead">{t('ask.noHits')}</p>
                   )}
 
-                  {t.mode === 'answer' ? (
+                  {turn.mode === 'answer' ? (
                     <div className="source-grid">
-                      {t.sources.slice(0, 4).map((s, i) => (
+                      {turn.sources.slice(0, 4).map((s, i) => (
                         <button key={s.chunkId} type="button" className="source-card" aria-pressed={active.turn === ti && active.src === i} onClick={() => show(ti, i)}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                             <span className="source-num">{s.n}</span>
@@ -270,49 +272,49 @@ export default function AskView({
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {t.sources.map((s, i) => (
+                      {turn.sources.map((s, i) => (
                         <button key={s.chunkId} type="button" className="hit-row" aria-pressed={active.turn === ti && active.src === i} onClick={() => show(ti, i)}>
                           <span className="muted" style={{ fontSize: 12, fontWeight: 700, paddingTop: 2 }}>{s.n}</span>
                           <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                             <span style={{ fontWeight: 600 }}>{s.file} <span className="muted" style={{ fontWeight: 400 }}>· {s.location}</span></span>
                             <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' }}>{s.short}</span>
                           </span>
-                          <span className="score-bar" aria-label={`Relevanz ${Math.round(s.score * 100)} %`}><span style={{ width: `${Math.round(s.score * 100)}%` }} /></span>
+                          <span className="score-bar" aria-label={t('ask.relevance', { pct: Math.round(s.score * 100) })}><span style={{ width: `${Math.round(s.score * 100)}%` }} /></span>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {t.mode === 'answer' && !t.searching && t.sources.length > 0 && (
+                {turn.mode === 'answer' && !turn.searching && turn.sources.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <div className="answer" aria-live={t.streaming ? 'polite' : undefined}>
-                      {t.answer
-                        ? renderAnswer(t.answer, (n) => {
-                          const i = t.sources.findIndex((s) => s.n === n)
+                    <div className="answer" aria-live={turn.streaming ? 'polite' : undefined}>
+                      {turn.answer
+                        ? renderAnswer(turn.answer, (n) => {
+                          const i = turn.sources.findIndex((s) => s.n === n)
                           if (i >= 0) show(ti, i)
-                        }, !!t.streaming)
-                        : t.streaming && (
+                        }, !!turn.streaming)
+                        : turn.streaming && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <span className="muted" style={{ fontSize: 12 }}>Quellen werden bewertet, Antwort wird erzeugt …</span>
+                            <span className="muted" style={{ fontSize: 12 }}>{t('ask.generating')}</span>
                             <div className="skeleton" style={{ width: '92%' }} />
                             <div className="skeleton" style={{ width: '70%' }} />
                           </div>
                         )}
                     </div>
-                    {t.done && !t.error && t.confidence && (
+                    {turn.done && !turn.error && turn.confidence && (
                       <div className="answer-foot">
-                        <span className={`chip ${t.confidence === 'hoch' ? 'kind-ok' : t.confidence === 'mittel' ? 'kind-warn' : 'kind-error'}`} style={{ fontSize: 12.5, padding: '5px 10px', borderRadius: 14 }}>
-                          <Icon name={t.confidence === 'hoch' ? 'check' : 'alert'} size={13} strokeWidth={2.4} />
-                          Konfidenz {t.confidence}{t.note && ` · ${t.note}`}
+                        <span className={`chip ${turn.confidence === 'high' ? 'kind-ok' : turn.confidence === 'medium' ? 'kind-warn' : 'kind-error'}`} style={{ fontSize: 12.5, padding: '5px 10px', borderRadius: 14 }}>
+                          <Icon name={turn.confidence === 'high' ? 'check' : 'alert'} size={13} strokeWidth={2.4} />
+                          {t('ask.confidence', { level: confidenceLabel(turn.confidence) })}{turn.note && ` · ${turn.note}`}
                         </span>
                         <div style={{ flex: 1 }} />
-                        <button type="button" className="btn" onClick={() => navigator.clipboard?.writeText(t.answer).then(() => toast('Antwort kopiert'))}>Kopieren</button>
+                        <button type="button" className="btn" onClick={() => navigator.clipboard?.writeText(turn.answer).then(() => toast(t('ask.copied')))}>{t('common.copy')}</button>
                       </div>
                     )}
                   </div>
                 )}
-                {t.error && <div className="inline-note error"><Icon name="alert" size={13} strokeWidth={2.2} />{t.error}</div>}
+                {turn.error && <div className="inline-note error"><Icon name="alert" size={13} strokeWidth={2.2} />{note(turn.error)}</div>}
               </article>
             ))}
             <div ref={endRef} />
@@ -321,13 +323,13 @@ export default function AskView({
 
         <form className="composer" onSubmit={(e) => { e.preventDefault(); run(draft) }}>
           <div className="composer-box">
-            <label htmlFor="q" className="sr-only">{turns.length ? 'Folgefrage' : 'Frage'}</label>
+            <label htmlFor="q" className="sr-only">{turns.length ? t('ask.followupLabel') : t('ask.questionLabel')}</label>
             <textarea
               id="q" ref={inputRef} rows={1} value={draft} autoFocus disabled={!hasCollections}
-              placeholder={!hasCollections ? 'Zuerst einen Ordner hinzufügen' : `${turns.length ? 'Folgefrage stellen' : 'Frage stellen'} … (↵ senden${searchOnly ? '' : `, ${MOD} K Nur Suche`})`}
+              placeholder={!hasCollections ? t('ask.addFolderFirst') : `${turns.length ? t('ask.askFollowup') : t('ask.ask')} … (${t('ask.sendHint')}${searchOnly ? '' : `, ${MOD} K ${t('ask.searchOnly')}`})`}
               onChange={(e) => setDraft(e.target.value)} onKeyDown={onKeyDown}
             />
-            <button type="submit" className="send" aria-label="Frage senden" disabled={!draft.trim() || busy}>
+            <button type="submit" className="send" aria-label={t('ask.send')} disabled={!draft.trim() || busy}>
               <Icon name="send" strokeWidth={2} />
             </button>
           </div>
@@ -336,10 +338,10 @@ export default function AskView({
 
       {previewOpen && <div className="preview-scrim" onClick={() => setPreviewOpen(false)} aria-hidden="true" />}
       {previewOpen && (
-        <aside id="source-panel" className="preview" aria-label="Quellenvorschau">
+        <aside id="source-panel" className="preview" aria-label={t('ask.preview')}>
           <div className="preview-head">
-            <span className="section-label" style={{ padding: 0 }}>Quelle</span>
-            <button type="button" className="icon-btn" aria-label="Quellenfenster ausblenden" onClick={() => setPreviewOpen(false)}>
+            <span className="section-label" style={{ padding: 0 }}>{t('ask.source')}</span>
+            <button type="button" className="icon-btn" aria-label={t('ask.hidePanel')} onClick={() => setPreviewOpen(false)}>
               <Icon name="close" size={14} strokeWidth={2.2} />
             </button>
           </div>
@@ -353,8 +355,8 @@ export default function AskView({
                 </div>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <button type="button" className="btn" onClick={() => fileAction(AppService.OpenDocument, current.fullPath)}><Icon name="external" size={14} />Öffnen</button>
-                <button type="button" className="btn" onClick={() => fileAction(AppService.RevealDocument, current.fullPath)}>{isMac ? 'Im Finder zeigen' : 'Im Explorer zeigen'}</button>
+                <button type="button" className="btn" onClick={() => fileAction(AppService.OpenDocument, current.fullPath)}><Icon name="external" size={14} />{t('common.open')}</button>
+                <button type="button" className="btn" onClick={() => fileAction(AppService.RevealDocument, current.fullPath)}>{isMac ? t('ask.revealFinder') : t('ask.revealExplorer')}</button>
               </div>
               <div className="excerpt">
                 <div className="excerpt-meta">{current.location}</div>
@@ -366,12 +368,12 @@ export default function AskView({
               </div>
               <div className="muted" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                 <Icon name="lock" size={13} strokeWidth={2} />
-                Textauszug zum Zeitpunkt der Frage · Datei wird nie verändert
+                {t('ask.excerptNote')}
               </div>
             </>
           ) : (
             <div className="muted" style={{ margin: 'auto', textAlign: 'center', maxWidth: 260, lineHeight: 1.5 }}>
-              Hier erscheint die Fundstelle, sobald du eine Quelle oder Zitatmarke anklickst.
+              {t('ask.previewEmpty')}
             </div>
           )}
         </aside>
@@ -396,7 +398,12 @@ function paragraphs(s: string): string[] {
   return tidy(s).split(/\n\n/).filter((p) => p.trim() !== '')
 }
 
-const STOP = new Set(['aber', 'alle', 'auch', 'dass', 'dein', 'deine', 'denn', 'diese', 'dieser', 'eine', 'einen', 'einer', 'haben', 'habe', 'mein', 'meine', 'meiner', 'meinem', 'nach', 'noch', 'oder', 'sein', 'sind', 'soll', 'über', 'unter', 'wann', 'warum', 'welche', 'welcher', 'wenn', 'werden', 'wieso', 'wird', 'wurde', 'gibt', 'gilt', 'steht', 'lange', 'viel', 'muss', 'müssen', 'erfolgen'])
+function confidenceLabel(c: string): string {
+  return c === 'high' || c === 'medium' || c === 'low' ? t(`conf.${c}`) : c
+}
+
+// Stop words of both UI languages; questions may be asked in either.
+const STOP = new Set(['about', 'after', 'also', 'been', 'does', 'from', 'have', 'into', 'many', 'much', 'must', 'should', 'some', 'than', 'that', 'their', 'there', 'these', 'they', 'this', 'what', 'when', 'where', 'which', 'while', 'will', 'with', 'would', 'your', 'aber', 'alle', 'auch', 'dass', 'dein', 'deine', 'denn', 'diese', 'dieser', 'eine', 'einen', 'einer', 'haben', 'habe', 'mein', 'meine', 'meiner', 'meinem', 'nach', 'noch', 'oder', 'sein', 'sind', 'soll', 'über', 'unter', 'wann', 'warum', 'welche', 'welcher', 'wenn', 'werden', 'wieso', 'wird', 'wurde', 'gibt', 'gilt', 'steht', 'lange', 'viel', 'muss', 'müssen', 'erfolgen'])
 
 // queryTerms are the question's content words (four letters or more).
 function queryTerms(q: string): string[] {
@@ -419,7 +426,7 @@ function renderAnswer(text: string, cite: (n: number) => void, streaming: boolea
     const c = part.match(/^\[(\d+)\]$/)
     if (c) {
       const n = Number(c[1])
-      return <button key={i} type="button" className="cite" onClick={() => cite(n)} aria-label={`Quelle ${n} anzeigen`}>{n}</button>
+      return <button key={i} type="button" className="cite" onClick={() => cite(n)} aria-label={t('ask.showSource', { n })}>{n}</button>
     }
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>
     return <Fragment key={i}>{part}</Fragment>

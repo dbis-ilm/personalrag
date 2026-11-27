@@ -7,14 +7,15 @@ import AskView from './views/AskView'
 import SourcesView from './views/SourcesView'
 import AgentsView from './views/AgentsView'
 import SetupView from './views/SetupView'
+import { Key, fmtDateTime, relDay, setLang, t } from './i18n'
 
 export type View = 'ask' | 'sources' | 'agents' | 'settings'
 
-const NAV: { id: View; label: string; icon: string }[] = [
-  { id: 'ask', label: 'Fragen', icon: 'chat' },
-  { id: 'sources', label: 'Quellen', icon: 'folder' },
-  { id: 'agents', label: 'Agenten (MCP)', icon: 'plug' },
-  { id: 'settings', label: 'Einstellungen', icon: 'gear' },
+const NAV: { id: View; label: Key; icon: string }[] = [
+  { id: 'ask', label: 'nav.ask', icon: 'chat' },
+  { id: 'sources', label: 'nav.sources', icon: 'folder' },
+  { id: 'agents', label: 'nav.agents', icon: 'plug' },
+  { id: 'settings', label: 'nav.settings', icon: 'gear' },
 ]
 
 export function errorText(e: unknown): string {
@@ -40,14 +41,15 @@ export default function App() {
 
   useEffect(() => {
     AppService.Status().then((st) => {
+      setLang(st.language)
       setStatus(st)
-      if (st.lastCrash) toast(`PersonalRAG wurde am ${st.lastCrash} unerwartet beendet. Details unter Einstellungen › Diagnose.`, 'warn')
+      if (st.lastCrash) toast(t('app.crashed', { when: fmtDateTime(st.lastCrash) }), 'warn')
     }).catch(console.error)
     AppService.IndexProgress().then(setProgress).catch(console.error)
     reloadCollections()
     reloadHistory()
     const offs = [
-      Events.On('status:changed', (ev) => { setStatus(ev.data); reloadCollections(); reloadHistory() }),
+      Events.On('status:changed', (ev) => { setLang(ev.data.language); setStatus(ev.data); reloadCollections(); reloadHistory() }),
       Events.On('index:progress', (ev) => setProgress(ev.data)),
       Events.On('sources:changed', () => reloadCollections()),
       Events.On('notice', (ev) => toast(ev.data.text, ev.data.kind)),
@@ -84,7 +86,7 @@ export default function App() {
     try {
       const c = await AppService.AddFolder()
       if (c.id) {
-        toast(`Sammlung „${c.name}“ angelegt, Indexierung läuft`, 'ok')
+        toast(t('app.collectionCreated', { name: c.name }), 'ok')
         reloadCollections()
       }
     } catch (e) {
@@ -93,11 +95,12 @@ export default function App() {
   }
 
   if (!status) return <div className="app" />
+  setLang(status.language)
 
   if (!status.setupDone) {
     return (
       <div className="app">
-        <div className="content setup-shell"><SetupView mode="wizard" status={status} onAddFolder={addFolder} collections={collections} /></div>
+        <div className="content setup-shell" key={status.language}><SetupView mode="wizard" status={status} onAddFolder={addFolder} collections={collections} /></div>
         <Toasts />
       </div>
     )
@@ -109,12 +112,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <nav className="sidebar" aria-label="Hauptnavigation">
+      <nav className="sidebar" aria-label={t('nav.main')}>
         <div className="brand">
           <div className="brand-logo"><Icon name="logo" strokeWidth={2} /></div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span className="brand-name">PersonalRAG</span>
-            <span className="brand-sub" title={status.remote ? `Fragen und Textauszüge gehen an ${status.remote}` : undefined}>{status.remote ? `Extern: ${status.remote}` : status.searchOnly ? 'Lokal · nur Suche' : `Lokal · ${status.llm}`}</span>
+            <span className="brand-sub" title={status.remote ? t('app.remoteTitle', { host: status.remote }) : undefined}>{status.remote ? t('app.remote', { host: status.remote }) : status.searchOnly ? t('app.localSearchOnly') : t('app.local', { model: status.llm })}</span>
           </div>
         </div>
 
@@ -122,25 +125,25 @@ export default function App() {
           {NAV.map((n) => (
             <button key={n.id} type="button" className="nav-item" aria-current={view === n.id ? 'page' : undefined} onClick={() => setView(n.id)}>
               <Icon name={n.icon} />
-              {n.label}
+              {t(n.label)}
             </button>
           ))}
         </div>
 
         <div className="nav">
           <div className="section-label">
-            <span>Sammlungen</span>
-            <button type="button" className="icon-btn" aria-label="Ordner als Sammlung hinzufügen" onClick={addFolder}>
+            <span>{t('app.collections')}</span>
+            <button type="button" className="icon-btn" aria-label={t('app.addCollection')} onClick={addFolder}>
               <Icon name="plus" size={14} strokeWidth={2.2} />
             </button>
           </div>
           {collections.length === 0 && (
-            <button type="button" className="nav-item muted" onClick={addFolder}>Ordner hinzufügen …</button>
+            <button type="button" className="nav-item muted" onClick={addFolder}>{t('app.addFolderEllipsis')}</button>
           )}
           {collections.length > 0 && (
             <button type="button" className={`nav-item${scope === '' ? ' is-active' : ''}`} aria-pressed={scope === ''} onClick={() => { setScope(''); setView('ask') }}>
               <span className="swatch" style={{ background: 'var(--muted)', borderRadius: 4 }} />
-              <span>Alle</span>
+              <span>{t('common.all')}</span>
             </button>
           )}
           {collections.map((c) => (
@@ -150,7 +153,7 @@ export default function App() {
             >
               <span className="swatch" style={{ background: c.color }} />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-              {c.sharedWithAgents && <span className="muted" style={{ display: 'inline-flex' }}><Icon name="plug" size={13} label="Für Agenten freigegeben" /></span>}
+              {c.sharedWithAgents && <span className="muted" style={{ display: 'inline-flex' }}><Icon name="plug" size={13} label={t('app.shared')} /></span>}
               <span className="nav-count">{c.docCount}</span>
             </button>
           ))}
@@ -158,12 +161,12 @@ export default function App() {
 
         <div className="nav">
           <div className="section-label">
-            <span>Verlauf</span>
-            <button type="button" className="icon-btn" aria-label="Neue Unterhaltung" title="Neue Unterhaltung" onClick={() => openConversation('', scope)}>
+            <span>{t('app.history')}</span>
+            <button type="button" className="icon-btn" aria-label={t('app.newConversation')} title={t('app.newConversation')} onClick={() => openConversation('', scope)}>
               <Icon name="plus" size={14} strokeWidth={2.2} />
             </button>
           </div>
-          {history.length === 0 && <span className="muted" style={{ padding: '0 10px', fontSize: 12 }}>Noch keine Unterhaltungen</span>}
+          {history.length === 0 && <span className="muted" style={{ padding: '0 10px', fontSize: 12 }}>{t('app.noConversations')}</span>}
           {history.slice(0, 50).map((h) => (
             <button
               key={h.id} type="button" className={`nav-item history-item${conversationId === h.id ? ' is-active' : ''}`}
@@ -171,7 +174,7 @@ export default function App() {
               onClick={() => openConversation(h.id, h.collectionId)}
             >
               <span className="history-title">{h.title}</span>
-              <span className="nav-count">{h.updated}</span>
+              <span className="nav-count">{relDay(h.updatedAt)}</span>
             </button>
           ))}
         </div>
@@ -179,13 +182,13 @@ export default function App() {
         {showProgress && progress && (
           <div className="progress-card" aria-live="polite">
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ fontWeight: 600 }}>{progress.paused ? 'Indexierung pausiert' : `Indexiere „${progress.collection}“`}</span>
+              <span style={{ fontWeight: 600 }}>{progress.paused ? t('app.indexPaused') : t('app.indexing', { name: progress.collection })}</span>
               <span className="muted" style={{ fontVariantNumeric: 'tabular-nums' }}>{progress.done} / {progress.total}</span>
             </div>
             <div className="progress-track"><div className="progress-bar" style={{ width: `${pct}%` }} /></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="muted" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progress.current || ' '}</span>
-              <button type="button" className="btn btn-sm btn-icon" onClick={() => AppService.SetIndexPaused(!progress.paused)} aria-label={progress.paused ? 'Indexierung fortsetzen' : 'Indexierung pausieren'}>
+              <button type="button" className="btn btn-sm btn-icon" onClick={() => AppService.SetIndexPaused(!progress.paused)} aria-label={progress.paused ? t('app.resume') : t('app.pause')}>
                 <Icon name={progress.paused ? 'play' : 'pause'} size={13} strokeWidth={2.2} />
               </button>
             </div>
@@ -193,12 +196,12 @@ export default function App() {
         )}
       </nav>
 
-      <div className="content">
+      <div className="content" key={status.language}>
         {status.error && view !== 'settings' && (
           <div className="banner" role="alert">
             <Icon name="alert" size={15} strokeWidth={2.2} />
             <span style={{ flex: 1 }}>{status.error}</span>
-            <button type="button" className="btn btn-sm" onClick={() => setView('settings')}>Einstellungen</button>
+            <button type="button" className="btn btn-sm" onClick={() => setView('settings')}>{t('nav.settings')}</button>
           </div>
         )}
         {view === 'ask' && (

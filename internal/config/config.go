@@ -27,6 +27,8 @@ type Settings struct {
 	// RemoteConsent is the host the user agreed to send document excerpts
 	// to; models on any other non-local host are refused.
 	RemoteConsent string `json:"remoteConsent,omitempty"`
+	// Language of the UI: "de", "en", or "" to follow the system.
+	Language string `json:"language,omitempty"`
 	// Exclude are file and folder name patterns skipped when indexing.
 	Exclude []string `json:"exclude,omitempty"`
 }

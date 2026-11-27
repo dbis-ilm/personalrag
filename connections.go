@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/dbis-ilm/askyourdocs"
 
 	"github.com/dbis-ilm/personalrag/internal/config"
+	"github.com/dbis-ilm/personalrag/internal/i18n"
 	"github.com/dbis-ilm/personalrag/internal/ingest"
 	"github.com/dbis-ilm/personalrag/internal/rag"
 	"github.com/dbis-ilm/personalrag/internal/secrets"
@@ -68,7 +68,13 @@ type ExclusionSettings struct {
 
 // errRemoteConsent asks the UI for explicit consent before excerpts go to
 // another machine.
-var errRemoteConsent = errors.New("Bestätigung nötig: Mit diesem Modell werden Textauszüge deiner Dokumente an einen anderen Rechner gesendet")
+var errRemoteConsent = consentError{}
+
+// consentError reads in the current language when shown, while errors.Is
+// still recognises it.
+type consentError struct{}
+
+func (consentError) Error() string { return i18n.T("conn.consentRequired") }
 
 // remoteHost returns the host that receives document excerpts under cfg, or
 // "" when every configured model runs on this machine.
@@ -84,7 +90,7 @@ func remoteHost(cfg config.Settings) string {
 // approved, e.g. after the GPUStack address was changed by hand.
 func checkConsent(cfg config.Settings) error {
 	if h := remoteHost(cfg); h != "" && cfg.RemoteConsent != h {
-		return fmt.Errorf("Freigabe fehlt: Textauszüge würden an %s gesendet. Bitte die Modelle in den Einstellungen erneut bestätigen", h)
+		return i18n.Errorf("core.consentMissing", h)
 	}
 	return nil
 }
@@ -169,7 +175,7 @@ func probeOllama(ctx context.Context, base string) ProviderInfo {
 	p := ProviderInfo{ID: providerOllama, Label: "Ollama", URL: base, Configured: true, Remote: !rag.IsLocal(base), Host: rag.Host(base), Models: []ModelInfo{}}
 	models, err := rag.OllamaModels(ctx, base)
 	if err != nil {
-		p.Error = "Ollama ist unter " + base + " nicht erreichbar."
+		p.Error = i18n.T("conn.ollamaUnreachable", base)
 		return p
 	}
 	p.OK = true
@@ -183,7 +189,7 @@ func probeGPUStack(ctx context.Context, base, key string) ProviderInfo {
 	p := ProviderInfo{ID: providerGPUStack, Label: "GPUStack", URL: base, Configured: true, Remote: !rag.IsLocal(base), Host: rag.Host(base), KeySet: key != "", Models: []ModelInfo{}}
 	names, err := rag.GPUStackModels(ctx, base, key)
 	if err != nil {
-		p.Error = "GPUStack unter " + base + ": " + err.Error()
+		p.Error = i18n.T("conn.gpustackError", base, err.Error())
 		return p
 	}
 	p.OK = true
@@ -214,7 +220,7 @@ func prefer(specs []string, wanted ...string) string {
 func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string, removeKey bool) error {
 	oh, err := rag.ValidateBaseURL(ollamaHost)
 	if err != nil {
-		return fmt.Errorf("Ollama: %w", err)
+		return i18n.Errorf("conn.ollama", err)
 	}
 	s.mu.RLock()
 	cfg := s.settings
@@ -223,21 +229,21 @@ func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string
 	gu := strings.TrimSpace(gpustackURL)
 	if gu == "" {
 		if providerOf(cfg.LLM) == providerGPUStack || providerOf(cfg.Embedding) == providerGPUStack {
-			return errors.New("Ein gewähltes Modell läuft über GPUStack. Wähle zuerst andere Modelle")
+			return i18n.Errorf("conn.gpustackInUse")
 		}
 		removeKey = true
 	} else if gu, err = rag.ValidateBaseURL(gu); err != nil {
-		return fmt.Errorf("GPUStack: %w", err)
+		return i18n.Errorf("conn.gpustack", err)
 	}
 
 	switch {
 	case removeKey:
 		if err := secrets.Delete(secrets.GPUStackKey); err != nil {
-			return fmt.Errorf("Schlüsselbund: %w", err)
+			return i18n.Errorf("core.keychain", err)
 		}
 	case gpustackKey != "":
 		if err := secrets.Set(secrets.GPUStackKey, strings.TrimSpace(gpustackKey)); err != nil {
-			return fmt.Errorf("Schlüsselbund: %w", err)
+			return i18n.Errorf("core.keychain", err)
 		}
 	}
 
@@ -255,7 +261,7 @@ func (s *AppService) SaveConnections(ollamaHost, gpustackURL, gpustackKey string
 // re-indexes everything.
 func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote bool) error {
 	if embeddingSpec == "" {
-		return errors.New("Ein Embedding-Modell ist erforderlich")
+		return i18n.Errorf("conn.embeddingRequired")
 	}
 	s.mu.RLock()
 	cfg := s.settings
@@ -265,10 +271,10 @@ func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote boo
 		case "", providerOllama:
 		case providerGPUStack:
 			if cfg.GPUStackURL == "" {
-				return errors.New("GPUStack ist nicht eingerichtet")
+				return i18n.Errorf("conn.gpustackMissing")
 			}
 		default:
-			return fmt.Errorf("Anbieter von %q wird nicht unterstützt", spec)
+			return i18n.Errorf("conn.providerUnknown", spec)
 		}
 	}
 	cand := cfg
@@ -292,7 +298,7 @@ func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote boo
 		dim, err = rag.EmbeddingDim(ctx, cfg.OllamaHost, name)
 	}
 	if err != nil {
-		return fmt.Errorf("Embedding-Modell %s: %w", name, err)
+		return i18n.Errorf("conn.embeddingFailed", name, err)
 	}
 	cand.EmbeddingDim = dim
 	if err := s.saveSettings(cand); err != nil {
@@ -302,17 +308,14 @@ func (s *AppService) SaveModels(llmSpec, embeddingSpec string, confirmRemote boo
 	return nil
 }
 
-var builtinExclusions = []string{
-	"Versteckte Dateien und Ordner (.*)",
-	"node_modules, __pycache__",
-	"Office-Sperrdateien (~$*) und *.tmp",
-	"Dateien über 200 MB",
+func builtinExclusions() []string {
+	return []string{i18n.T("exclusions.hidden"), i18n.T("exclusions.dev"), i18n.T("exclusions.office"), i18n.T("exclusions.size")}
 }
 
 func (s *AppService) Exclusions() ExclusionSettings {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return ExclusionSettings{Patterns: slices.Clone(s.settings.Exclude), Builtin: builtinExclusions}
+	return ExclusionSettings{Patterns: slices.Clone(s.settings.Exclude), Builtin: builtinExclusions()}
 }
 
 // SaveExclusions stores name patterns to skip and re-scans, which removes
@@ -340,7 +343,7 @@ func (s *AppService) SaveExclusions(patterns []string) error {
 		c.ix.SetExcludes(clean)
 		go func() {
 			if err := c.ix.ScanAll(s.appCtx); err != nil {
-				s.emit(EventNotice, Notice{Text: "Abgleich nach Änderung der Ausschlüsse fehlgeschlagen: " + err.Error(), Kind: "warn"})
+				s.emit(EventNotice, Notice{Text: i18n.T("exclusions.scanFailed", err.Error()), Kind: "warn"})
 			}
 		}()
 	}

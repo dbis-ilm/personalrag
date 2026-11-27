@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/dbis-ilm/personalrag/internal/i18n"
 )
 
 // probeClient waits longer than httpClient: the first embedding request may
@@ -23,10 +24,10 @@ func ValidateBaseURL(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return "", fmt.Errorf("%q ist keine gültige Adresse (http:// oder https:// mit Host)", raw)
+		return "", i18n.Errorf("conn.badURL", raw)
 	}
 	if u.User != nil {
-		return "", errors.New("Zugangsdaten gehören nicht in die Adresse, bitte das Feld für den API-Schlüssel nutzen")
+		return "", i18n.Errorf("conn.credentialsInURL")
 	}
 	return strings.TrimRight(u.String(), "/"), nil
 }
@@ -64,7 +65,7 @@ func GPUStackModels(ctx context.Context, base, apiKey string) ([]string, error) 
 	authorize(req, apiKey)
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("nicht erreichbar: %w", err)
+		return nil, i18n.Errorf("conn.unreachable", err)
 	}
 	defer res.Body.Close()
 	if err := statusError(res); err != nil {
@@ -76,7 +77,7 @@ func GPUStackModels(ctx context.Context, base, apiKey string) ([]string, error) 
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		return nil, fmt.Errorf("unerwartete Antwort von %s/models: %w", base, err)
+		return nil, fmt.Errorf("unexpected answer from %s/models: %w", base, err)
 	}
 	out := make([]string, 0, len(body.Data))
 	for _, m := range body.Data {
@@ -99,11 +100,11 @@ func GPUStackEmbeddingDim(ctx context.Context, base, apiKey, model string) (int,
 	authorize(req, apiKey)
 	res, err := probeClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("nicht erreichbar: %w", err)
+		return 0, i18n.Errorf("conn.unreachable", err)
 	}
 	defer res.Body.Close()
 	if err := statusError(res); err != nil {
-		return 0, fmt.Errorf("%s ist kein Embedding-Modell oder nicht verfügbar: %w", model, err)
+		return 0, i18n.Errorf("conn.notEmbedding", model, err)
 	}
 	var body struct {
 		Data []struct {
@@ -111,7 +112,7 @@ func GPUStackEmbeddingDim(ctx context.Context, base, apiKey, model string) (int,
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil || len(body.Data) == 0 || len(body.Data[0].Embedding) == 0 {
-		return 0, fmt.Errorf("%s lieferte keinen Vektor", model)
+		return 0, i18n.Errorf("conn.noVector", model)
 	}
 	return len(body.Data[0].Embedding), nil
 }
@@ -137,9 +138,9 @@ func authorize(req *http.Request, apiKey string) {
 func statusError(res *http.Response) error {
 	switch {
 	case res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden:
-		return errors.New("API-Schlüssel abgelehnt")
+		return i18n.Errorf("conn.keyRejected")
 	case res.StatusCode >= 300:
-		return fmt.Errorf("Server antwortet mit %s", res.Status)
+		return i18n.Errorf("conn.serverStatus", res.Status)
 	}
 	return nil
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/dbis-ilm/personalrag/internal/agent"
 	"github.com/dbis-ilm/personalrag/internal/config"
 	"github.com/dbis-ilm/personalrag/internal/history"
+	"github.com/dbis-ilm/personalrag/internal/i18n"
 	"github.com/dbis-ilm/personalrag/internal/indexer"
 	"github.com/dbis-ilm/personalrag/internal/ingest"
 	"github.com/dbis-ilm/personalrag/internal/logging"
@@ -60,7 +61,11 @@ type AppStatus struct {
 	Embedding  string `json:"embedding"`
 	Error      string `json:"error"`
 	DataDir    string `json:"dataDir"`
-	LastCrash  string `json:"lastCrash"` // when the previous run crashed; "" if it did not
+	LastCrash  string `json:"lastCrash"` // when the previous run crashed (RFC 3339); "" if it did not
+	// Language is the language in use ("de" | "en"); LanguageSetting what
+	// the user chose ("" = follow the system).
+	Language        string `json:"language"`
+	LanguageSetting string `json:"languageSetting"`
 	// Remote is the host that receives document excerpts ("" = all local);
 	// LLMProvider is "Ollama" or "GPUStack".
 	Remote      string `json:"remote"`
@@ -81,7 +86,7 @@ type ConversationSummary struct {
 	ID           string `json:"id"`
 	Title        string `json:"title"`
 	CollectionID string `json:"collectionId"`
-	Updated      string `json:"updated"`
+	UpdatedAt    int64  `json:"updatedAt"` // unix milliseconds
 }
 
 // Turn is one question with its sources and answer.
@@ -137,7 +142,7 @@ type AnswerChunk struct {
 
 type AnswerDone struct {
 	TurnID     int64  `json:"turnId"`
-	Confidence string `json:"confidence"` // "hoch" | "mittel" | "niedrig"
+	Confidence string `json:"confidence"` // "high" | "medium" | "low"
 	Note       string `json:"note"`
 	Error      string `json:"error"`
 }
@@ -155,7 +160,8 @@ type Folder struct {
 	Path       string `json:"path"`
 	Collection string `json:"collection"`
 	Files      int    `json:"files"`
-	State      string `json:"state"`
+	State      string `json:"state"`     // "current" | "working" | "notes" | "empty"
+	Count      int    `json:"count"`     // files in work or with notes
 	StateKind  string `json:"stateKind"` // "ok" | "running" | "info"
 }
 
@@ -165,9 +171,9 @@ type Document struct {
 	FullPath   string `json:"fullPath"`
 	Collection string `json:"collection"`
 	Format     string `json:"format"`
-	Modified   string `json:"modified"`
-	Status     string `json:"status"` // pending | running | ok | error | ocr | cloud
-	Note       string `json:"note"`
+	ModTime    int64  `json:"modTime"` // unix milliseconds, 0 if unknown
+	Status     string `json:"status"`  // pending | running | ok | error | ocr | cloud
+	Note       string `json:"note"`    // "@code" for known notes (see indexer), else plain text
 	Chunks     int    `json:"chunks"`
 }
 
@@ -181,10 +187,10 @@ type SourcesChanged struct {
 }
 
 type MCPStatus struct {
-	Running   bool   `json:"running"`
-	Address   string `json:"address"`
-	TokenHint string `json:"tokenHint"`
-	Note      string `json:"note"`
+	Running     bool   `json:"running"`
+	Address     string `json:"address"`
+	TokenHint   string `json:"tokenHint"`
+	SharedCount int    `json:"sharedCount"` // collections visible to agents
 }
 
 type ClientConfig struct {
@@ -194,13 +200,13 @@ type ClientConfig struct {
 }
 
 type AccessLogEntry struct {
-	Time     string `json:"time"`
-	Client   string `json:"client"`
-	Tool     string `json:"tool"`
-	Query    string `json:"query"`
-	Result   string `json:"result"`
-	Kind     string `json:"kind"`
-	Duration string `json:"duration"`
+	At         int64  `json:"at"` // unix milliseconds
+	Client     string `json:"client"`
+	Tool       string `json:"tool"`
+	Query      string `json:"query"`
+	Result     string `json:"result"`
+	Kind       string `json:"kind"`
+	DurationMs int64  `json:"durationMs"`
 }
 
 // ---- Service ----
@@ -231,6 +237,8 @@ type AppService struct {
 	// restartMu serialises core restarts, so two overlapping restarts can
 	// never both open the index; restarts tracks the asynchronous ones and
 	// closing stops new ones once the service shuts down.
+	onLanguage func()
+
 	restartMu sync.Mutex
 	restarts  sync.WaitGroup
 	closing   bool
@@ -262,11 +270,16 @@ func (s *AppService) ServiceStartup(ctx context.Context, _ application.ServiceOp
 	s.appCtx = ctx
 	if s.logs != nil {
 		if when, text, ok := s.logs.TakeCrash(); ok {
-			s.lastCrash, s.crashText = when.Format("02.01.2006 15:04"), text
+			s.lastCrash, s.crashText = when.Format(time.RFC3339), text
 			slog.Warn("previous run crashed", "at", when)
 		}
 	}
 	st, err := config.Load(s.dataDir)
+	if s.agentMode {
+		i18n.Set(i18n.EN) // texts for agents are always English
+	} else {
+		i18n.Set(i18n.Resolve(st.Language))
+	}
 	if err != nil {
 		slog.Warn("settings unreadable, using defaults", "err", err)
 	}
@@ -329,6 +342,7 @@ func (s *AppService) restartCore() {
 		SetupDone: cfg.SetupDone, DataDir: s.dataDir,
 		LLM: modelName(cfg.LLM), Embedding: modelName(cfg.Embedding), SearchOnly: cfg.LLM == "",
 		LastCrash: s.lastCrash, Remote: remoteHost(cfg), LLMProvider: providerLabel(providerOf(cfg.LLM)),
+		Language: string(i18n.Current()), LanguageSetting: cfg.Language,
 	}
 	if err != nil {
 		slog.Error("core start failed", "err", err)
@@ -371,7 +385,7 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 	if cfg.GPUStackURL != "" {
 		var err error
 		if gpuKey, err = secrets.Get(secrets.GPUStackKey); err != nil {
-			return fail(fmt.Errorf("Schlüsselbund: %w", err))
+			return fail(i18n.Errorf("core.keychain", err))
 		}
 	}
 
@@ -404,12 +418,15 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 		slog.Warn("embedding model changed, resetting vectors", "err", err)
 		if s.agentMode {
 			// Re-indexing is the app's job; agents wait for it.
-			return fail(errors.New("der Index wird für ein neues Embedding-Modell neu aufgebaut; bitte PersonalRAG öffnen"))
+			return fail(i18n.Errorf("core.rebuilding"))
 		}
 		err = c.st.ResetVectors()
 	}
 	if err != nil {
-		return fail(fmt.Errorf("Index öffnen: %w", err))
+		if errors.Is(err, migrate.ErrTooNew) {
+			return fail(i18n.Errorf("core.tooNew"))
+		}
+		return fail(i18n.Errorf("core.openIndex", err))
 	}
 
 	var llm ai.Model
@@ -463,7 +480,7 @@ func (s *AppService) current() (*core, error) {
 		if s.status.Error != "" {
 			return nil, errors.New(s.status.Error)
 		}
-		return nil, errors.New("Index ist noch nicht bereit")
+		return nil, i18n.Errorf("core.notReady")
 	}
 	return s.core, nil
 }
@@ -546,7 +563,7 @@ func (s *AppService) Collections() ([]Collection, error) {
 func (s *AppService) AddFolder() (Collection, error) {
 	path, err := application.Get().Dialog.OpenFile().
 		CanChooseDirectories(true).CanChooseFiles(false).
-		SetTitle("Ordner indexieren").SetButtonText("Hinzufügen").
+		SetTitle(i18n.T("dialog.addFolder")).SetButtonText(i18n.T("dialog.add")).
 		PromptForSingleSelection()
 	if err != nil || path == "" {
 		return Collection{}, err
@@ -562,7 +579,7 @@ func (s *AppService) AddFolderPath(path string) (Collection, error) {
 	}
 	path = paths.Canonical(path)
 	if fi, err := os.Stat(path); err != nil || !fi.IsDir() {
-		return Collection{}, fmt.Errorf("%s ist kein Ordner", path)
+		return Collection{}, i18n.Errorf("folder.notADir", path)
 	}
 	if err := s.checkOverlap(c, path); err != nil {
 		return Collection{}, err
@@ -599,9 +616,9 @@ func (s *AppService) checkOverlap(c *core, path string) error {
 	for _, f := range folders {
 		switch {
 		case paths.Within(path, f.Path):
-			return fmt.Errorf("Der Ordner gehört bereits zur Sammlung „%s“", s.collectionName(f.CollectionID))
+			return i18n.Errorf("folder.inCollection", s.collectionName(f.CollectionID))
 		case paths.Within(f.Path, path):
-			return fmt.Errorf("Der Ordner enthält %s aus der Sammlung „%s“. Entferne diese Sammlung zuerst oder wähle einen anderen Ordner", displayPath(f.Path), s.collectionName(f.CollectionID))
+			return i18n.Errorf("folder.contains", displayPath(f.Path), s.collectionName(f.CollectionID))
 		}
 	}
 	return nil
@@ -646,16 +663,16 @@ func (s *AppService) AddPaths(dropped []string) Notice {
 	}
 	var parts []string
 	if added > 0 {
-		parts = append(parts, fmt.Sprintf("%d Ordner hinzugefügt", added))
+		parts = append(parts, i18n.T("drop.foldersAdded", added))
 	}
 	if queued > 0 {
-		parts = append(parts, fmt.Sprintf("%d Datei(en) werden zuerst indexiert", queued))
+		parts = append(parts, i18n.T("drop.filesQueued", queued))
 	}
 	if outside > 0 {
-		parts = append(parts, fmt.Sprintf("%d Datei(en) liegen in keinem überwachten Ordner, bitte den Ordner hinzufügen", outside))
+		parts = append(parts, i18n.T("drop.filesOutside", outside))
 	}
 	if unsupported > 0 {
-		parts = append(parts, fmt.Sprintf("%d Datei(en) im nicht unterstützten Format", unsupported))
+		parts = append(parts, i18n.T("drop.filesUnsupported", unsupported))
 	}
 	if lastErr != nil {
 		parts = append(parts, lastErr.Error())
@@ -698,7 +715,7 @@ func (s *AppService) Rescan() error {
 		return err
 	}
 	if c.ix == nil {
-		return errors.New("Kein Embedding-Modell eingerichtet")
+		return i18n.Errorf("core.noEmbedding")
 	}
 	go func() {
 		if err := c.ix.ScanAll(s.appCtx); err != nil {
@@ -732,14 +749,14 @@ func (s *AppService) Folders() ([]Folder, error) {
 					total++
 				}
 			}
-			fo := Folder{Path: displayPath(f), Collection: cl.Name, Files: total, State: "Aktuell", StateKind: "ok"}
+			fo := Folder{Path: displayPath(f), Collection: cl.Name, Files: total, State: "current", StateKind: "ok"}
 			switch open := counts[store.StatusPending] + counts[store.StatusRunning]; {
 			case open > 0:
-				fo.State, fo.StateKind = fmt.Sprintf("%d Datei(en) in Arbeit", open), "running"
+				fo.State, fo.Count, fo.StateKind = "working", open, "running"
 			case counts[store.StatusError]+counts[store.StatusOCR] > 0:
-				fo.State, fo.StateKind = fmt.Sprintf("Aktuell · %d mit Hinweis", counts[store.StatusError]+counts[store.StatusOCR]), "info"
+				fo.State, fo.Count, fo.StateKind = "notes", counts[store.StatusError]+counts[store.StatusOCR], "info"
 			case total == 0:
-				fo.State, fo.StateKind = "Keine unterstützten Dateien gefunden", "info"
+				fo.State, fo.StateKind = "empty", "info"
 			}
 			out = append(out, fo)
 		}
@@ -760,14 +777,10 @@ func (s *AppService) Documents(status string) ([]Document, error) {
 	names := s.collectionNames(c)
 	out := make([]Document, 0, len(docs))
 	for _, d := range docs {
-		mod := ""
-		if d.ModTime > 0 {
-			mod = time.Unix(d.ModTime, 0).Format("02.01.2006")
-		}
 		out = append(out, Document{
 			Name: filepath.Base(d.Path), Dir: displayPath(filepath.Dir(d.Path)), FullPath: d.Path,
-			Collection: names[d.CollectionID], Format: d.Format, Modified: mod,
-			Status: d.Status, Note: d.Note, Chunks: d.Chunks,
+			Collection: names[d.CollectionID], Format: d.Format, ModTime: d.ModTime * 1000,
+			Status: d.Status, Note: noteCode(d.Note), Chunks: d.Chunks,
 		})
 	}
 	return out, nil
@@ -781,10 +794,10 @@ func (s *AppService) Reindex(path string) error {
 	}
 	d, ok, err := c.st.DocumentByPath(s.appCtx, path)
 	if err != nil || !ok {
-		return errors.New("Dokument ist nicht im Index")
+		return i18n.Errorf("doc.notIndexed")
 	}
 	if c.ix == nil {
-		return errors.New("Kein Embedding-Modell eingerichtet")
+		return i18n.Errorf("core.noEmbedding")
 	}
 	c.ix.Enqueue([]string{d.Path}, d.CollectionID, true)
 	return nil
@@ -820,7 +833,7 @@ func (s *AppService) checkIndexed(path string) error {
 		return err
 	}
 	if _, ok, _ := c.st.DocumentByPath(s.appCtx, path); !ok {
-		return errors.New("Dokument ist nicht im Index")
+		return i18n.Errorf("doc.notIndexed")
 	}
 	return nil
 }
@@ -890,7 +903,7 @@ func (s *AppService) Search(conversationID, question, collectionID, mode string)
 		out.Standalone = standalone
 	}
 	if res.VectorErr != nil {
-		out.Notice = "Nur Volltextsuche: Das Embedding-Modell ist nicht erreichbar."
+		out.Notice = i18n.T("search.keywordOnly")
 	}
 	best := 0.0
 	if len(res.Results) > 0 {
@@ -931,13 +944,13 @@ func (s *AppService) Ask(turnID int64) error {
 		return err
 	}
 	if !c.eng.HasModel() {
-		return errors.New("Kein Antwortmodell eingerichtet – Suchmodus verwenden")
+		return i18n.Errorf("core.noAnswerModel")
 	}
 	s.mu.RLock()
 	cs, ok := s.searches[turnID]
 	s.mu.RUnlock()
 	if !ok {
-		return errors.New("Suche abgelaufen, bitte erneut fragen")
+		return i18n.Errorf("search.expired")
 	}
 	go func() {
 		var text strings.Builder
@@ -950,10 +963,10 @@ func (s *AppService) Ask(turnID int64) error {
 				lastSave = time.Now()
 			}
 		})
-		done := AnswerDone{TurnID: turnID, Confidence: ans.Confidence, Note: ans.Note}
+		done := AnswerDone{TurnID: turnID, Confidence: string(ans.Confidence), Note: answerNote(ans)}
 		if err != nil {
 			slog.Error("answer failed", "err", err)
-			done.Error = "Die Antwort konnte nicht erzeugt werden: " + err.Error()
+			done.Error = i18n.T("answer.failed", err.Error())
 		}
 		if err := c.hist.Finish(s.appCtx, turnID, text.String(), done.Confidence, done.Note, done.Error); err != nil {
 			slog.Error("history: saving answer failed", "err", err)
@@ -975,7 +988,7 @@ func (s *AppService) Conversations() ([]ConversationSummary, error) {
 	}
 	out := make([]ConversationSummary, len(list))
 	for i, cv := range list {
-		out[i] = ConversationSummary{ID: cv.ID, Title: cv.Title, CollectionID: cv.CollectionID, Updated: relTime(cv.UpdatedAt)}
+		out[i] = ConversationSummary{ID: cv.ID, Title: cv.Title, CollectionID: cv.CollectionID, UpdatedAt: cv.UpdatedAt.UnixMilli()}
 	}
 	return out, nil
 }
@@ -998,7 +1011,7 @@ func (s *AppService) Conversation(id string) (ConversationDetail, error) {
 		}
 		out.Turns = append(out.Turns, Turn{
 			ID: t.ID, Question: t.Question, Standalone: t.Standalone, Mode: t.Mode, Sources: src,
-			Answer: t.Answer, Confidence: t.Confidence, Note: t.Note, Error: t.Error, Done: t.Done,
+			Answer: t.Answer, Confidence: confidenceCode(t.Confidence), Note: t.Note, Error: t.Error, Done: t.Done,
 		})
 	}
 	return out, nil
@@ -1031,34 +1044,85 @@ func firstNonEmpty(v ...string) string {
 	return ""
 }
 
-// formatDuration labels a call duration: "0,4 s", "12 s", "2:05 min".
-func formatDuration(d time.Duration) string {
-	switch {
-	case d <= 0:
-		return ""
-	case d < 10*time.Second:
-		return strings.Replace(fmt.Sprintf("%.1f s", d.Seconds()), ".", ",", 1)
-	case d < time.Minute:
-		return fmt.Sprintf("%d s", int(d.Round(time.Second).Seconds()))
-	}
-	s := int(d.Round(time.Second).Seconds())
-	return fmt.Sprintf("%d:%02d min", s/60, s%60)
+// legacyNotes maps the German document notes stored by earlier versions to
+// the codes the UI translates.
+var legacyNotes = map[string]string{
+	"Datei nicht lesbar":                                  indexer.NoteUnreadable,
+	"Keine Textebene erkannt":                             indexer.NoteNeedsOCR,
+	"Embedding-Modell nicht erreichbar":                   indexer.NoteEmbeddingUnreachable,
+	"Kein Text gefunden":                                  indexer.NoteNoText,
+	"Datei ist passwortgeschützt":                         indexer.NoteEncrypted,
+	"Datei ist beschädigt oder hat ein ungültiges Format": indexer.NoteCorrupt,
 }
 
-// relTime labels a timestamp for the history list.
-func relTime(t time.Time) string {
-	now := time.Now()
-	y1, m1, d1 := now.Date()
-	y2, m2, d2 := t.Date()
-	switch {
-	case y1 == y2 && m1 == m2 && d1 == d2:
-		return t.Format("15:04")
-	case now.Sub(t) < 48*time.Hour && now.AddDate(0, 0, -1).Day() == d2:
-		return "Gestern"
-	case y1 == y2:
-		return t.Format("02.01.")
+func noteCode(n string) string {
+	if c, ok := legacyNotes[n]; ok {
+		return c
 	}
-	return t.Format("02.01.2006")
+	return n
+}
+
+// confidenceCode maps the German labels stored by earlier versions to codes.
+func confidenceCode(c string) string {
+	switch c {
+	case "hoch":
+		return "high"
+	case "mittel":
+		return "medium"
+	case "niedrig":
+		return "low"
+	}
+	return c
+}
+
+// answerNote words how the sources were rated, in the current language.
+func answerNote(a rag.Answer) string {
+	switch {
+	case a.Total == 0:
+		return i18n.T("answer.noHits")
+	case a.Fallback:
+		return i18n.T("answer.fallback")
+	}
+	return i18n.T("answer.used", len(a.Used), a.Total)
+}
+
+// ---- Language ----
+
+// SetLanguage sets the UI language: "de", "en" or "" to follow the system.
+// Go-side texts switch at once; the tray menu follows via onLanguage.
+func (s *AppService) SetLanguage(setting string) error {
+	switch setting {
+	case "", "de", "en":
+	default:
+		return fmt.Errorf("unsupported language %q", setting)
+	}
+	s.mu.RLock()
+	cfg := s.settings
+	s.mu.RUnlock()
+	cfg.Language = setting
+	if err := s.saveSettings(cfg); err != nil {
+		return err
+	}
+	lang := i18n.Resolve(setting)
+	i18n.Set(lang)
+	s.mu.Lock()
+	s.status.Language, s.status.LanguageSetting = string(lang), setting
+	st := s.status
+	hook := s.onLanguage
+	s.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	s.emit(EventStatusChanged, st)
+	return nil
+}
+
+// onLanguageChange registers a callback run after the language changed,
+// e.g. to relabel the tray menu.
+func (s *AppService) onLanguageChange(f func()) {
+	s.mu.Lock()
+	s.onLanguage = f
+	s.mu.Unlock()
 }
 
 // ---- Diagnostics ----
@@ -1091,7 +1155,7 @@ func (s *AppService) SetLogLevel(level string) error {
 // RevealLogs opens the log folder in Finder / Explorer.
 func (s *AppService) RevealLogs() error {
 	if s.logs == nil {
-		return errors.New("Kein Protokoll eingerichtet")
+		return i18n.Errorf("core.noLog")
 	}
 	switch runtime.GOOS {
 	case "darwin":
@@ -1117,27 +1181,27 @@ func (s *AppService) Diagnostics() string {
 
 	line("PersonalRAG %s", version)
 	line("System: %s/%s, %s, Wails %s", runtime.GOOS, runtime.GOARCH, runtime.Version(), wailsVersion())
-	line("Datenverzeichnis: %s", displayPath(s.dataDir))
-	line("Protokollstufe: %s", s.LogLevel())
-	emb := "keins"
+	line("Data directory: %s", displayPath(s.dataDir))
+	line("Log level: %s, language: %s", s.LogLevel(), i18n.Current())
+	emb := "none"
 	if cfg.Embedding != "" {
 		emb = fmt.Sprintf("%s (%d Dimensionen)", cfg.Embedding, cfg.EmbeddingDim)
 	}
-	llm := "keins (nur Suche)"
+	llm := "none (search only)"
 	if cfg.LLM != "" {
 		llm = cfg.LLM
 	}
-	line("Modelle: Embedding %s, Antwort %s", emb, llm)
-	ollama := "erreichbar"
+	line("Models: embedding %s, answers %s", emb, llm)
+	ollama := "reachable"
 	ctx, cancel := context.WithTimeout(s.appCtx, 3*time.Second)
 	if _, err := rag.OllamaModels(ctx, cfg.OllamaHost); err != nil {
-		ollama = "nicht erreichbar"
+		ollama = "not reachable"
 	}
 	cancel()
 	line("Ollama: %s, %s", cfg.OllamaHost, ollama)
-	line("Status: bereit=%v, Einrichtung abgeschlossen=%v", st.Ready, st.SetupDone)
+	line("Status: ready=%v, setup done=%v", st.Ready, st.SetupDone)
 	if st.Error != "" {
-		line("Fehler: %s", st.Error)
+		line("Error: %s", st.Error)
 	}
 
 	if c, err := s.current(); err == nil {
@@ -1151,26 +1215,26 @@ func (s *AppService) Diagnostics() string {
 				total += n
 			}
 		}
-		line("Index: %d Sammlungen, %d Dokumente (%s)", len(colls), total, strings.Join(parts, ", "))
+		line("Index: %d collections, %d documents (%s)", len(colls), total, strings.Join(parts, ", "))
 		convs, _ := c.hist.List(s.appCtx, 1_000_000)
-		line("Verlauf: %d Unterhaltungen", len(convs))
+		line("History: %d conversations", len(convs))
 		vi, _ := migrate.Version(s.appCtx, c.st.DB(), "index")
 		vh, _ := migrate.Version(s.appCtx, c.st.DB(), "history")
 		line("Schema: index v%d, history v%d", vi, vh)
 		if c.ix != nil {
 			p := c.ix.Progress()
-			line("Indexierung: aktiv=%v, pausiert=%v, %d/%d", p.Active, p.Paused, p.Done, p.Total)
+			line("Indexing: active=%v, paused=%v, %d/%d", p.Active, p.Paused, p.Done, p.Total)
 		}
 	}
 
 	if s.crashText != "" {
 		line("")
-		line("--- Absturz am %s ---", s.lastCrash)
+		line("--- Crash at %s ---", s.lastCrash)
 		line("%s", redactHome(s.crashText))
 	}
 	if s.logs != nil {
 		line("")
-		line("--- Protokoll (letzte 200 Zeilen) ---")
+		line("--- Log (last 200 lines) ---")
 		for _, l := range s.logs.Tail(200) {
 			line("%s", redactHome(l))
 		}
@@ -1195,7 +1259,7 @@ func wailsVersion() string {
 			}
 		}
 	}
-	return "unbekannt"
+	return "unknown"
 }
 
 // ---- Agents (MCP) ----
@@ -1223,14 +1287,7 @@ func (s *AppService) MCPStatus() MCPStatus {
 			}
 		}
 	}
-	switch shared {
-	case 0:
-		st.Note = "Noch keine Sammlung freigegeben: Agenten sehen nichts, bis du unten eine freigibst."
-	case 1:
-		st.Note = "Agenten sehen 1 freigegebene Sammlung, nur lesend. Der Client startet PersonalRAG dafür selbst, die App muss nicht geöffnet sein."
-	default:
-		st.Note = fmt.Sprintf("Agenten sehen %d freigegebene Sammlungen, nur lesend. Der Client startet PersonalRAG dafür selbst, die App muss nicht geöffnet sein.", shared)
-	}
+	st.SharedCount = shared
 	return st
 }
 
@@ -1242,7 +1299,7 @@ func (s *AppService) ClientConfigs() []ClientConfig {
 	return []ClientConfig{
 		{
 			Name: "OpenCode",
-			Hint: "In opencode.json im Projekt oder in ~/.config/opencode/opencode.json eintragen.",
+			Hint: i18n.T("client.opencode"),
 			Snippet: fmt.Sprintf(`{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
@@ -1256,7 +1313,7 @@ func (s *AppService) ClientConfigs() []ClientConfig {
 		},
 		{
 			Name: "Claude Desktop",
-			Hint: "In claude_desktop_config.json eintragen und Claude Desktop neu starten.",
+			Hint: i18n.T("client.claudeDesktop"),
 			Snippet: fmt.Sprintf(`{
   "mcpServers": {
     "personalrag": {
@@ -1268,12 +1325,12 @@ func (s *AppService) ClientConfigs() []ClientConfig {
 		},
 		{
 			Name:    "Claude Code",
-			Hint:    "Im Terminal ausführen.",
+			Hint:    i18n.T("client.claudeCode"),
 			Snippet: fmt.Sprintf(`claude mcp add personalrag -- %q --mcp`, exe),
 		},
 		{
 			Name: "Cursor",
-			Hint: "In ~/.cursor/mcp.json eintragen.",
+			Hint: i18n.T("client.cursor"),
 			Snippet: fmt.Sprintf(`{
   "mcpServers": {
     "personalrag": { "command": %q, "args": ["--mcp"] }
@@ -1295,7 +1352,7 @@ func (s *AppService) AccessLog() []AccessLogEntry {
 		return out
 	}
 	for _, e := range entries {
-		out = append(out, AccessLogEntry{Time: relTime(e.At), Client: firstNonEmpty(e.Client, "unbekannt"), Tool: e.Tool, Query: e.Request, Result: e.Result, Kind: e.Kind, Duration: formatDuration(e.Duration)})
+		out = append(out, AccessLogEntry{At: e.At.UnixMilli(), Client: e.Client, Tool: e.Tool, Query: e.Request, Result: e.Result, Kind: e.Kind, DurationMs: e.Duration.Milliseconds()})
 	}
 	return out
 }

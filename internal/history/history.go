@@ -17,7 +17,7 @@ import (
 )
 
 // ErrNotFound is returned for unknown conversations or turns.
-var ErrNotFound = errors.New("Unterhaltung nicht gefunden")
+var ErrNotFound = errors.New("conversation not found")
 
 type Conversation struct {
 	ID           string
@@ -196,7 +196,7 @@ func (s *Store) Finish(ctx context.Context, id int64, answer, confidence, note, 
 // MarkInterrupted closes answers that were still streaming when the app
 // stopped, keeping whatever text had arrived.
 func (s *Store) MarkInterrupted(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE turns SET done = 1, error = 'Antwort wurde nicht fertiggestellt (App beendet).' WHERE done = 0`)
+	_, err := s.db.ExecContext(ctx, `UPDATE turns SET done = 1, error = '@interrupted' WHERE done = 0`)
 	return err
 }
 

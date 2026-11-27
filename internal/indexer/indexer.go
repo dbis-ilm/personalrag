@@ -353,17 +353,17 @@ func (ix *Indexer) process(ctx context.Context, j job) {
 
 	hash, err := ingest.HashFile(j.path)
 	if err != nil {
-		_ = ix.st.SetDocumentState(ctx, id, store.StatusError, "Datei nicht lesbar", "")
+		_ = ix.st.SetDocumentState(ctx, id, store.StatusError, NoteUnreadable, "")
 		return
 	}
 	res, err := ix.flow.Run(ctx, fileInput{Path: j.path, DocumentID: id, CollectionID: j.collectionID})
 	switch {
 	case err == nil && res.OCR:
-		_ = ix.st.SetDocumentState(ctx, id, store.StatusOCR, "Keine Textebene erkannt", "")
+		_ = ix.st.SetDocumentState(ctx, id, store.StatusOCR, NoteNeedsOCR, "")
 		return
 	case err != nil && (ctx.Err() != nil || isUnreachable(err)):
 		// Leave it pending; the next scan retries.
-		_ = ix.st.SetDocumentState(ctx, id, store.StatusPending, "Embedding-Modell nicht erreichbar", "")
+		_ = ix.st.SetDocumentState(ctx, id, store.StatusPending, NoteEmbeddingUnreachable, "")
 		return
 	case err != nil:
 		_ = ix.st.SetDocumentState(ctx, id, store.StatusError, describe(err), "")
@@ -372,7 +372,7 @@ func (ix *Indexer) process(ctx context.Context, j job) {
 	n := res.Chunks
 	note := ""
 	if n == 0 {
-		note = "Kein Text gefunden"
+		note = NoteNoText
 	}
 	_ = ix.st.SetDocumentState(ctx, id, store.StatusOK, note, hash)
 	slog.Debug("indexed", "path", j.path, "chunks", n)
@@ -383,13 +383,24 @@ func isUnreachable(err error) bool {
 	return strings.Contains(s, "connection refused") || strings.Contains(s, "no such host") || strings.Contains(s, "deadline exceeded")
 }
 
+// Document notes are stored as codes ("@…") so the UI can show them in its
+// language; anything else is a raw error message.
+const (
+	NoteUnreadable           = "@unreadable"
+	NoteNeedsOCR             = "@ocr"
+	NoteEmbeddingUnreachable = "@embedding-unreachable"
+	NoteNoText               = "@no-text"
+	NoteEncrypted            = "@encrypted"
+	NoteCorrupt              = "@corrupt"
+)
+
 func describe(err error) string {
 	s := err.Error()
 	switch {
 	case strings.Contains(strings.ToLower(s), "encrypt") || strings.Contains(strings.ToLower(s), "password"):
-		return "Datei ist passwortgeschützt"
+		return NoteEncrypted
 	case strings.Contains(s, "not a PDF") || strings.Contains(s, "invalid header") || strings.Contains(s, "zip: not a valid"):
-		return "Datei ist beschädigt oder hat ein ungültiges Format"
+		return NoteCorrupt
 	case len(s) > 140:
 		return s[:140] + "…"
 	}

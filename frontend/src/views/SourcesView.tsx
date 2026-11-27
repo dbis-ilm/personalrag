@@ -4,14 +4,24 @@ import { AppService, Collection, Document, Folder } from '../../bindings/github.
 import Icon from '../components/Icon'
 import { toast } from '../components/Toasts'
 import { errorText } from '../App'
+import { Key, fmtDate, note, t } from '../i18n'
 
-const STATUS: Record<string, { label: string; action?: string }> = {
-  ok: { label: 'Indexiert', action: 'Neu indexieren' },
-  pending: { label: 'Wartend', action: 'Vorziehen' },
-  running: { label: 'Wird indexiert' },
-  error: { label: 'Fehler', action: 'Erneut versuchen' },
-  ocr: { label: 'Braucht OCR' },
-  cloud: { label: 'Nicht lokal' },
+const STATUS: Record<string, { label: Key; action?: Key }> = {
+  ok: { label: 'status.ok', action: 'action.ok' },
+  pending: { label: 'status.pending', action: 'action.pending' },
+  running: { label: 'status.running' },
+  error: { label: 'status.error', action: 'action.error' },
+  ocr: { label: 'status.ocr' },
+  cloud: { label: 'status.cloud' },
+}
+
+function folderState(f: Folder): string {
+  switch (f.state) {
+    case 'working': return t('folder.working', { count: f.count })
+    case 'notes': return t('folder.notes', { count: f.count })
+    case 'empty': return t('folder.empty')
+    default: return t('folder.current')
+  }
 }
 const FILTERS = ['', 'ok', 'pending', 'running', 'error', 'ocr']
 const isMac = document.documentElement.classList.contains('platform-mac')
@@ -51,7 +61,7 @@ export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }
   const remove = (c: Collection) => {
     if (confirm !== c.id) { setConfirm(c.id); return }
     setConfirm('')
-    act(AppService.RemoveCollection(c.id), `„${c.name}“ aus dem Index entfernt. Die Dateien bleiben unverändert.`)
+    act(AppService.RemoveCollection(c.id), t('src.removed', { name: c.name }))
   }
 
   return (
@@ -59,14 +69,14 @@ export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }
       <div className="page">
         <div className="page-head">
           <div className="grow">
-            <h1>Quellen</h1>
-            <p className="lead">Überwachte Ordner und alle indexierten Dokumente. Änderungen werden beim Start und alle 15 Minuten abgeglichen.</p>
+            <h1>{t('nav.sources')}</h1>
+            <p className="lead">{t('src.lead')}</p>
           </div>
-          <button type="button" className="btn" style={{ minHeight: 34 }} onClick={() => act(AppService.Rescan(), 'Ordner werden geprüft')}>Jetzt abgleichen</button>
-          <button type="button" className="btn btn-primary" style={{ minHeight: 34 }} onClick={onAddFolder}><Icon name="plus" size={14} strokeWidth={2.2} />Ordner hinzufügen</button>
+          <button type="button" className="btn" style={{ minHeight: 34 }} onClick={() => act(AppService.Rescan(), t('src.rescanning'))}>{t('src.rescan')}</button>
+          <button type="button" className="btn btn-primary" style={{ minHeight: 34 }} onClick={onAddFolder}><Icon name="plus" size={14} strokeWidth={2.2} />{t('common.addFolder')}</button>
         </div>
 
-        <section aria-label="Überwachte Ordner" className="folder-grid">
+        <section aria-label={t('src.folders')} className="folder-grid">
           {folders.map((f) => {
             const c = collections.find((x) => x.name === f.collection)
             return (
@@ -77,13 +87,13 @@ export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   <span className="tag">{f.collection}</span>
-                  <span className="tag">{f.files} Dateien</span>
+                  <span className="tag">{t('src.files', { count: f.files })}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className={`text-${f.stateKind}`} style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>{f.state}</span>
+                  <span className={`text-${f.stateKind}`} style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>{folderState(f)}</span>
                   {c && (
                     <button type="button" className={`btn btn-sm${confirm === c.id ? ' btn-danger' : ''}`} onClick={() => remove(c)} onBlur={() => setConfirm('')}>
-                      {confirm === c.id ? 'Wirklich entfernen?' : 'Entfernen'}
+                      {confirm === c.id ? t('src.confirmRemove') : t('src.remove')}
                     </button>
                   )}
                 </div>
@@ -92,28 +102,28 @@ export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }
           })}
           <button type="button" className="dropzone" data-file-drop-target onClick={onAddFolder}>
             <Icon name="upload" size={20} />
-            Ordner hierher ziehen oder klicken
+            {t('src.drop')}
           </button>
         </section>
 
-        <section aria-label="Dokumente" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <section aria-label={t('src.documents')} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-            <div role="group" aria-label="Nach Status filtern" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div role="group" aria-label={t('src.filter')} style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {FILTERS.filter((id) => !id || counts[id]).map((id) => (
                 <button key={id || 'all'} type="button" className="filter-pill" aria-pressed={filter === id} onClick={() => setFilter(id)}>
-                  {id ? STATUS[id].label : 'Alle'} <span style={{ opacity: 0.7, fontVariantNumeric: 'tabular-nums' }}>{counts[id] ?? 0}</span>
+                  {id ? t(STATUS[id].label) : t('common.all')} <span style={{ opacity: 0.7, fontVariantNumeric: 'tabular-nums' }}>{counts[id] ?? 0}</span>
                 </button>
               ))}
             </div>
             <div style={{ flex: 1 }} />
-            <label htmlFor="docsearch" className="sr-only">Dokumente durchsuchen</label>
-            <input id="docsearch" className="input" type="search" placeholder="Dateiname oder Pfad …" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 240, maxWidth: '100%' }} />
+            <label htmlFor="docsearch" className="sr-only">{t('src.searchDocs')}</label>
+            <input id="docsearch" className="input" type="search" placeholder={t('src.searchPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 240, maxWidth: '100%' }} />
           </div>
 
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Dokument</th><th>Sammlung</th><th>Format</th><th>Geändert</th><th>Status</th><th style={{ textAlign: 'right' }}>Aktionen</th></tr>
+                <tr><th>{t('src.colDocument')}</th><th>{t('src.colCollection')}</th><th>{t('src.colFormat')}</th><th>{t('src.colModified')}</th><th>{t('src.colStatus')}</th><th style={{ textAlign: 'right' }}>{t('src.colActions')}</th></tr>
               </thead>
               <tbody>
                 {shown.map((d) => (
@@ -125,31 +135,31 @@ export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }
                       </div>
                     </td>
                     <td>{d.collection}</td>
-                    <td style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{d.format}{d.chunks > 0 && <span className="muted"> · {d.chunks} Abschn.</span>}</td>
-                    <td style={{ color: 'var(--text-2)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.modified}</td>
+                    <td style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{d.format}{d.chunks > 0 && <span className="muted"> · {t('src.chunks', { count: d.chunks })}</span>}</td>
+                    <td style={{ color: 'var(--text-2)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmtDate(d.modTime)}</td>
                     <td>
-                      <span className={`chip kind-${d.status}`}><span className="chip-dot" />{STATUS[d.status]?.label ?? d.status}</span>
-                      {d.note && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{d.note}</div>}
+                      <span className={`chip kind-${d.status}`}><span className="chip-dot" />{STATUS[d.status] ? t(STATUS[d.status].label) : d.status}</span>
+                      {d.note && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{note(d.note)}</div>}
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {STATUS[d.status]?.action && (
-                        <button type="button" className="btn btn-sm" onClick={() => act(AppService.Reindex(d.fullPath), `${d.name} wird indexiert`)}>{STATUS[d.status].action}</button>
+                        <button type="button" className="btn btn-sm" onClick={() => act(AppService.Reindex(d.fullPath), t('src.reindexing', { name: d.name }))}>{t(STATUS[d.status].action!)}</button>
                       )}{' '}
-                      <button type="button" className="btn btn-sm" onClick={() => act(AppService.RevealDocument(d.fullPath))}>{isMac ? 'Im Finder' : 'Im Explorer'}</button>
+                      <button type="button" className="btn btn-sm" onClick={() => act(AppService.RevealDocument(d.fullPath))}>{isMac ? t('src.inFinder') : t('src.inExplorer')}</button>
                     </td>
                   </tr>
                 ))}
                 {docs.length === 0 && (
                   <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 24 }}>
-                    {all.length === 0 ? 'Noch keine Dokumente. Füge einen Ordner hinzu.' : 'Keine Dokumente für diesen Filter.'}
+                    {all.length === 0 ? t('src.noDocs') : t('src.noMatch')}
                   </td></tr>
                 )}
               </tbody>
             </table>
           </div>
           <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-            {docs.length > shown.length && `Es werden die ersten ${shown.length} von ${docs.length} Dokumenten gezeigt. `}
-            Unterstützt: PDF, Word (.docx), Markdown, Text, HTML. Ausgeschlossen: versteckte Dateien und Ordner, node_modules, Office-Sperrdateien, Dateien über 200 MB.
+            {docs.length > shown.length && `${t('src.truncated', { shown: shown.length, total: docs.length })} `}
+            {t('src.supported')}
           </p>
         </section>
       </div>
