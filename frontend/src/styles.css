@@ -342,3 +342,4 @@ mark.term { background: transparent; color: var(--accent-text); font-weight: 650
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 .answer-table table { min-width: 0; }
+.agent-remote { margin: 0 auto 8px; max-width: 760px; width: calc(100% - 32px); }

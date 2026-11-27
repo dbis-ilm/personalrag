@@ -87,6 +87,8 @@ export const en: Record<keyof typeof de, string> = {
   'agent.working': 'Agent working ({model}) … {count} steps',
   'agent.thinking': 'Agent working …',
   'agent.stop': 'Stop',
+  'agent.remote': 'The agent runs on {host}: the task, document lists and the excerpts it reads go to that server.',
+  'agent.remoteLocalExtract': 'For “Extract” the local answer model reads the text; only the results go there.',
   'agent.steps_one': '{count} step',
   'agent.steps_other': '{count} steps',
   'tool.list_collections': 'Collections',

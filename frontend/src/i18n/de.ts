@@ -87,6 +87,8 @@ export const de = {
   'agent.working': 'Agent arbeitet ({model}) … {count} Schritte',
   'agent.thinking': 'Agent arbeitet …',
   'agent.stop': 'Stopp',
+  'agent.remote': 'Der Agent läuft auf {host}: Aufgabe, Dokumentlisten und gelesene Auszüge gehen an diesen Server.',
+  'agent.remoteLocalExtract': 'Beim „Auswerten“ liest das lokale Antwortmodell den Text; dorthin gehen nur die Ergebnisse.',
   'agent.steps_one': '{count} Schritt',
   'agent.steps_other': '{count} Schritte',
   'tool.list_collections': 'Sammlungen',
