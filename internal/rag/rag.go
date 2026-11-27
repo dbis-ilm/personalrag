@@ -32,7 +32,11 @@ const (
 	candidatesPerList = 20
 	maxSources        = 8
 	minRelevant       = 5 // rerank score (0–10) a source needs to be used
-	maxUsed           = 5
+	// contextBudget caps the source text given to the answer model, in
+	// characters (~6–8k tokens; the local model runs with 16k). It holds all
+	// eight sources at their usual size, so a relevant source is left out
+	// only when the sources are unusually long.
+	contextBudget = 24000
 )
 
 // Result is one search hit as shown to the user, numbered from 1.
@@ -51,6 +55,7 @@ type Search struct {
 type Answer struct {
 	Confidence askyourdocs.Confidence // high | medium | low
 	Used       []int                  // source numbers given to the model
+	Relevant   int                    // sources rated relevant (Used may hold fewer: budget)
 	Total      int                    // sources ranked
 	Fallback   bool                   // no source was clearly relevant
 }
@@ -153,22 +158,15 @@ func (e *Engine) Answer(ctx context.Context, question string, results []Result, 
 	}
 	scores := askyourdocs.RerankScores(ctx, e.rerank, e.llm, e.llmConfig, question, texts, askyourdocs.RerankOptions{})
 
-	order := make([]int, len(results))
-	for i := range order {
-		order[i] = i
+	sizes := make([]int, len(results))
+	for i, r := range results {
+		sizes[i] = len(firstNonEmpty(r.Hit.ParentText, r.Hit.Text))
 	}
-	sort.SliceStable(order, func(a, b int) bool { return scores[order[a]] > scores[order[b]] })
-	var used []int
-	for _, i := range order {
-		if scores[i] >= minRelevant && len(used) < maxUsed {
-			used = append(used, i)
-		}
+	used, relevant, fallback := selectSources(scores, sizes, contextBudget)
+	top := 0
+	for _, s := range scores {
+		top = max(top, s)
 	}
-	fallback := len(used) == 0
-	if fallback {
-		used = order[:min(3, len(order))]
-	}
-	top := scores[order[0]]
 	conf := askyourdocs.RateConfidence(top, fallback)
 
 	var ctxText strings.Builder
@@ -203,7 +201,36 @@ func (e *Engine) Answer(ctx context.Context, question string, results []Result, 
 		return Answer{}, err
 	}
 
-	return Answer{Confidence: conf, Used: nums, Total: len(results), Fallback: fallback}, nil
+	return Answer{Confidence: conf, Used: nums, Relevant: relevant, Total: len(results), Fallback: fallback}, nil
+}
+
+// selectSources picks the sources for the answer: every source rated
+// relevant, best first, while their text fits budget characters (the best
+// one always). Without a relevant source it falls back to the three best.
+// used holds indexes into scores; relevant counts the sources rated
+// relevant, used or not.
+func selectSources(scores, sizes []int, budget int) (used []int, relevant int, fallback bool) {
+	order := make([]int, len(scores))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool { return scores[order[a]] > scores[order[b]] })
+	spent := 0
+	for _, i := range order {
+		if scores[i] < minRelevant {
+			continue
+		}
+		relevant++
+		if len(used) > 0 && spent+sizes[i] > budget {
+			continue // a later, shorter source may still fit
+		}
+		used = append(used, i)
+		spent += sizes[i]
+	}
+	if len(used) == 0 {
+		return order[:min(3, len(order))], 0, true
+	}
+	return used, relevant, false
 }
 
 // Pages normalises a chunk's page range; non-paged formats report "0" or "1".
