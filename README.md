@@ -50,6 +50,21 @@ wails3 package   # macOS: bin/PersonalRAG.app with icon
 
 On macOS, start the bundle (`open bin/PersonalRAG.app`) to get the Dock icon. On first start a setup assistant checks the model connection, lets you pick the models and asks for the first folder.
 
+### Building for Windows
+
+**On GitHub:** the CI workflow builds natively on `windows-latest` (x64) after running all tests on Windows, and attaches `bin/` as the artifact `personalrag-Windows` to each run for 14 days. Use this for releases and whenever you need proof that it works on Windows.
+
+**On macOS:** the Go code is CGo-free, so Windows can be cross-compiled without Docker:
+
+```sh
+wails3 task windows:build ARCH=amd64    # bin/PersonalRAG.exe: x64, GUI subsystem, icon and manifest embedded
+wails3 task windows:build ARCH=arm64    # for Windows on ARM, e.g. a Windows 11 VM on Apple Silicon
+```
+
+> **Pitfall:** `wails3 build GOOS=windows` does not pass the architecture on and builds for the Mac's own architecture. On Apple Silicon that is an arm64 `.exe`, which does not run on ordinary x64 Windows PCs. Always call the task with `ARCH`.
+
+A cross-build only compiles; the Go tests do not run on Windows. For an installer instead of the bare `.exe`, install NSIS (`brew install makensis`) and run `wails3 task windows:create:nsis:installer ARCH=amd64`; it bundles the WebView2 bootstrapper for Windows 10 (not yet tested). Building regenerates the icons, which rewrites `build/darwin/Assets.car` with different bytes; `git checkout -- build/darwin/Assets.car` restores it.
+
 ## Data, privacy and logs
 
 | What | Where |
