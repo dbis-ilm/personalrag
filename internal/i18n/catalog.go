@@ -43,6 +43,7 @@ var catalog = map[string]entry{
 
 	// Asking
 	"search.keywordOnly":  {"Nur Volltextsuche: Das Embedding-Modell ist nicht erreichbar.", "Keyword search only: the embedding model is not reachable."},
+	"search.empty":        {"Bitte eine Frage eingeben", "Please enter a question"},
 	"search.expired":      {"Die Suche ist abgelaufen, bitte erneut fragen", "The search has expired, please ask again"},
 	"answer.failed":       {"Die Antwort konnte nicht erzeugt werden: %s", "The answer could not be generated: %s"},
 	"answer.nothingFound": {"In deinen Dokumenten habe ich dazu nichts gefunden.", "I found nothing about this in your documents."},

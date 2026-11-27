@@ -305,3 +305,5 @@ mark.term { background: transparent; color: var(--accent-text); font-weight: 650
 .about-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 6px; }
 .about-legal { margin: 2px 0 0; font-size: 11.5px; }
 .about-actions { display: flex; justify-content: flex-end; gap: 8px; width: 100%; margin-top: 8px; }
+
+.more-btn { align-self: flex-start; margin-top: 4px; }

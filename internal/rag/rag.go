@@ -100,18 +100,30 @@ func (e *Engine) Condense(ctx context.Context, question string, history []askyou
 	return askyourdocs.CondenseFollowUp(ctx, e.condense, e.llm, e.llmConfig, question, history)
 }
 
+// MaxSources is how many results a search shows at first (and how many an
+// answer is built from); "show more" asks SearchN for further ones.
+const MaxSources = maxSources
+
 // Search runs vector and keyword search and fuses them. A failing vector
 // search (e.g. embedding model unreachable) degrades to keyword search.
 func (e *Engine) Search(ctx context.Context, question, collectionID string) (Search, error) {
+	return e.SearchN(ctx, question, collectionID, maxSources)
+}
+
+// SearchN is Search for up to n results; the candidate lists grow with n.
+// Deeper lists can reorder the fused ranking slightly, so a caller paging
+// through results should skip chunks it has already shown.
+func (e *Engine) SearchN(ctx context.Context, question, collectionID string, n int) (Search, error) {
 	var out Search
-	vec, err := e.st.Retrieve(ctx, question, candidatesPerList, collectionID)
+	candidates := max(candidatesPerList, n)
+	vec, err := e.st.Retrieve(ctx, question, candidates, collectionID)
 	if err != nil {
 		slog.WarnContext(ctx, "vector search failed, keyword only", "err", err)
 		out.VectorErr = err
 	}
-	kw, err := e.st.KeywordSearch(ctx, question, candidatesPerList, collectionID, store.GermanStopWords)
+	kw, err := e.st.KeywordSearch(ctx, question, candidates, collectionID, store.GermanStopWords)
 	if err != nil {
-		return out, fmt.Errorf("Volltextsuche: %w", err)
+		return out, fmt.Errorf("keyword search: %w", err)
 	}
 
 	byID := map[int64]store.Hit{}
@@ -130,7 +142,7 @@ func (e *Engine) Search(ctx context.Context, question, collectionID string) (Sea
 	fused := askyourdocs.ReciprocalRankFusion([]askyourdocs.RankedList{
 		{Docs: toDocs(vec), Weight: 1},
 		{Docs: toDocs(kw), Weight: 1},
-	}, 60, maxSources)
+	}, 60, n)
 
 	for i, f := range fused {
 		id, _ := strconv.ParseInt(f.Text, 10, 64)

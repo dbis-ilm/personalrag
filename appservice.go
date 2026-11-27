@@ -103,6 +103,7 @@ type Turn struct {
 	Standalone string   `json:"standalone"` // follow-up rewritten for search; "" if unchanged
 	Mode       string   `json:"mode"`       // "answer" | "search"
 	Sources    []Source `json:"sources"`
+	HasMore    bool     `json:"hasMore"` // search turns: further matches may exist
 	Answer     string   `json:"answer"`
 	Confidence string   `json:"confidence"`
 	Note       string   `json:"note"`
@@ -138,9 +139,21 @@ type SearchResult struct {
 	TurnID         int64    `json:"turnId"`
 	Standalone     string   `json:"standalone"`
 	Sources        []Source `json:"sources"`
+	HasMore        bool     `json:"hasMore"` // MoreSources may find further matches
 	Millis         int      `json:"millis"`
 	Notice         string   `json:"notice"`
 }
+
+// MoreResult is the next page of a search turn's sources.
+type MoreResult struct {
+	Sources []Source `json:"sources"`
+	HasMore bool     `json:"hasMore"`
+}
+
+const (
+	morePage = 8  // sources per "show more"
+	maxShown = 96 // sources a turn shows at most
+)
 
 type AnswerChunk struct {
 	TurnID int64  `json:"turnId"`
@@ -872,7 +885,7 @@ func toProgress(p indexer.Progress) IndexProgress {
 func (s *AppService) Search(conversationID, question, collectionID, mode string) (SearchResult, error) {
 	question = strings.TrimSpace(question)
 	if question == "" {
-		return SearchResult{Sources: []Source{}}, errors.New("Leere Frage")
+		return SearchResult{Sources: []Source{}}, i18n.Errorf("search.empty")
 	}
 	if mode != "search" {
 		mode = "answer"
@@ -919,6 +932,7 @@ func (s *AppService) Search(conversationID, question, collectionID, mode string)
 	for _, r := range res.Results {
 		out.Sources = append(out.Sources, toSource(r, best))
 	}
+	out.HasMore = mode == "search" && len(res.Results) == rag.MaxSources
 	snapshot, err := json.Marshal(out.Sources)
 	if err != nil {
 		return SearchResult{}, err
@@ -940,6 +954,71 @@ func (s *AppService) Search(conversationID, question, collectionID, mode string)
 		s.order = s.order[1:]
 	}
 	s.mu.Unlock()
+	return out, nil
+}
+
+// mayHaveMore guesses for a stored search turn whether "show more" could
+// find further matches: every page so far came back full. A wrong guess
+// costs one click that finds nothing.
+func mayHaveMore(mode string, shown int) bool {
+	return mode == "search" && shown >= rag.MaxSources && (shown-rag.MaxSources)%morePage == 0 && shown < maxShown
+}
+
+// MoreSources finds the next matches of a search turn and appends them to
+// its stored sources. Matches already shown are skipped, since a deeper
+// search can reorder the fused ranking a little.
+func (s *AppService) MoreSources(turnID int64) (MoreResult, error) {
+	c, err := s.current()
+	if err != nil {
+		return MoreResult{}, err
+	}
+	t, err := c.hist.Turn(s.appCtx, turnID)
+	if err != nil {
+		return MoreResult{}, err
+	}
+	conv, _, err := c.hist.Get(s.appCtx, t.ConversationID)
+	if err != nil {
+		return MoreResult{}, err
+	}
+	var shown []Source
+	if len(t.Sources) > 0 {
+		if err := json.Unmarshal(t.Sources, &shown); err != nil {
+			return MoreResult{}, err
+		}
+	}
+	if len(shown) >= maxShown {
+		return MoreResult{Sources: []Source{}}, nil
+	}
+	want := min(len(shown)+morePage, maxShown)
+	res, err := c.eng.SearchN(s.appCtx, firstNonEmpty(t.Standalone, t.Question), conv.CollectionID, want)
+	if err != nil {
+		return MoreResult{}, err
+	}
+	seen := make(map[int64]bool, len(shown))
+	for _, src := range shown {
+		seen[src.ChunkID] = true
+	}
+	best := 0.0
+	if len(res.Results) > 0 {
+		best = res.Results[0].Hit.Score
+	}
+	out := MoreResult{Sources: []Source{}}
+	for _, r := range res.Results {
+		if seen[r.Hit.ChunkID] || len(out.Sources) == morePage {
+			continue
+		}
+		r.N = len(shown) + len(out.Sources) + 1
+		out.Sources = append(out.Sources, toSource(r, best))
+	}
+	all := append(shown, out.Sources...)
+	out.HasMore = len(res.Results) == want && len(out.Sources) == morePage && len(all) < maxShown
+	snapshot, err := json.Marshal(all)
+	if err != nil {
+		return MoreResult{}, err
+	}
+	if err := c.hist.SetSources(s.appCtx, turnID, snapshot); err != nil {
+		return MoreResult{}, err
+	}
 	return out, nil
 }
 
@@ -1018,7 +1097,8 @@ func (s *AppService) Conversation(id string) (ConversationDetail, error) {
 		}
 		out.Turns = append(out.Turns, Turn{
 			ID: t.ID, Question: t.Question, Standalone: t.Standalone, Mode: t.Mode, Sources: src,
-			Answer: t.Answer, Confidence: confidenceCode(t.Confidence), Note: t.Note, Error: t.Error, Done: t.Done,
+			HasMore: mayHaveMore(t.Mode, len(src)),
+			Answer:  t.Answer, Confidence: confidenceCode(t.Confidence), Note: t.Note, Error: t.Error, Done: t.Done,
 		})
 	}
 	return out, nil
