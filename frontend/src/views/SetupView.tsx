@@ -117,7 +117,7 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
           </select>
           <label className="check">
             <input
-              type="checkbox" checked={!!rt?.agentTextLocal} disabled={!rt?.llm.startsWith('ollama/')}
+              type="checkbox" checked={!!rt?.agentTextLocal} disabled={!llm.startsWith('ollama/')}
               onChange={(e) => {
                 const on = e.target.checked
                 AppService.SaveAgentTextLocal(on)
@@ -128,7 +128,7 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
             {t('setup.agentTextLocal')}
           </label>
           <span className="muted" style={{ fontSize: 12 }}>
-            {rt?.llm.startsWith('ollama/') ? t('setup.agentTextLocalHint') : t('setup.agentTextLocalNeedsLocal')}
+            {llm.startsWith('ollama/') ? t('setup.agentTextLocalHint') : t('setup.agentTextLocalNeedsLocal', { model: llm.replace(/^[a-z]+\//, '') || t('setup.noLlmShort') })}
           </span>
           <span className="muted" style={{ fontSize: 12 }}>
             {t('setup.agentHint')}
