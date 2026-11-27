@@ -459,8 +459,14 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 	if emb != nil && !s.agentMode {
 		c.ix = indexer.New(g, c.st, func(p indexer.Progress) { s.emit(EventIndexProgress, toProgress(p)) }, s.sourcesChanged)
 		c.ix.SetExcludes(cfg.Exclude)
-		c.wg.Add(2)
+		c.wg.Add(3)
 		go func() { defer c.wg.Done(); c.ix.Run(ctx) }()
+		go func() {
+			defer c.wg.Done()
+			if err := c.ix.Watch(ctx); err != nil {
+				slog.Warn("file watcher unavailable; changes are picked up by the periodic scan", "err", err)
+			}
+		}()
 		go func() {
 			defer c.wg.Done()
 			t := time.NewTicker(rescanInterval)
@@ -702,6 +708,9 @@ func (s *AppService) RemoveCollection(id string) error {
 	}
 	if err := c.st.DeleteCollection(s.appCtx, id); err != nil {
 		return err
+	}
+	if c.ix != nil {
+		c.ix.RefreshWatch(s.appCtx)
 	}
 	s.sourcesChanged()
 	return nil

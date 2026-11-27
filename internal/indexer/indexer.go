@@ -19,7 +19,9 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 
 	"github.com/dbis-ilm/personalrag/internal/ingest"
+	"github.com/dbis-ilm/personalrag/internal/paths"
 	"github.com/dbis-ilm/personalrag/internal/store"
+	"github.com/dbis-ilm/personalrag/internal/watcher"
 )
 
 const (
@@ -71,7 +73,7 @@ type Indexer struct {
 	collName map[string]string
 	scanning sync.Mutex
 	excludes []string // user patterns, matched against file and folder names
-
+	watch    *watcher.Watcher
 }
 
 // New creates an indexer and defines its "indexFile" flow on g (askyourdocs
@@ -283,24 +285,12 @@ func (ix *Indexer) ScanCollection(ctx context.Context, c store.Collection) error
 			}
 			seen[path] = true
 			doc, ok := byPath[path]
-			switch {
-			case !ok:
-				if _, err := ix.st.UpsertDocument(ctx, store.Document{
-					Path: path, CollectionID: c.ID, Size: info.Size(), ModTime: info.ModTime().Unix(),
-					Format: ingest.Format(path), Status: store.StatusPending,
-				}); err != nil {
-					return err
-				}
-				changed = true
-				todo = append(todo, path)
-			case doc.Status == store.StatusPending || doc.Status == store.StatusRunning:
-				todo = append(todo, path)
-			case doc.Size != info.Size() || doc.ModTime != info.ModTime().Unix():
-				h, err := ingest.HashFile(path)
-				if err == nil && h == doc.Hash && doc.Status == store.StatusOK {
-					_ = ix.st.TouchDocument(ctx, doc.ID, info.Size(), info.ModTime().Unix())
-					return nil
-				}
+			queue, added, err := ix.check(ctx, path, info, c.ID, doc, ok)
+			if err != nil {
+				return err
+			}
+			changed = changed || added
+			if queue {
 				todo = append(todo, path)
 			}
 			return nil
@@ -326,7 +316,222 @@ func (ix *Indexer) ScanCollection(ctx context.Context, c store.Collection) error
 	// Counts only: file names stay out of the log at info.
 	slog.Info("scan done", "collection", c.ID, "files", len(seen), "queued", len(todo), "removed", removed)
 	ix.Enqueue(todo, c.ID, false)
+	ix.RefreshWatch(ctx)
 	return nil
+}
+
+// check decides whether a file needs indexing: new files get a pending
+// document row (added), changed ones are queued unless only their mtime
+// moved and the content hash is unchanged.
+func (ix *Indexer) check(ctx context.Context, path string, info fs.FileInfo, collectionID string, doc store.Document, known bool) (queue, added bool, err error) {
+	switch {
+	case !known:
+		if _, err := ix.st.UpsertDocument(ctx, store.Document{
+			Path: path, CollectionID: collectionID, Size: info.Size(), ModTime: info.ModTime().Unix(),
+			Format: ingest.Format(path), Status: store.StatusPending,
+		}); err != nil {
+			return false, false, err
+		}
+		return true, true, nil
+	case doc.Status == store.StatusPending || doc.Status == store.StatusRunning:
+		return true, false, nil
+	case doc.Size != info.Size() || doc.ModTime != info.ModTime().Unix():
+		h, err := ingest.HashFile(path)
+		if err == nil && h == doc.Hash && doc.Status == store.StatusOK {
+			_ = ix.st.TouchDocument(ctx, doc.ID, info.Size(), info.ModTime().Unix())
+			return false, false, nil
+		}
+		return true, false, nil
+	}
+	return false, false, nil
+}
+
+// ---- Watching ----
+
+// Watch reports file changes in the collections' folders to Changed until
+// ctx ends. Without it (or if it fails) the periodic scan still catches
+// every change, only later.
+func (ix *Indexer) Watch(ctx context.Context) error {
+	opts := watcher.DefaultOptions
+	opts.SkipDir = func(name string) bool { return ingest.SkipDir(name) || ix.excluded(name) }
+	w, err := watcher.New(opts, func(b watcher.Batch) {
+		if ctx.Err() != nil {
+			return
+		}
+		var err error
+		if b.Rescan {
+			slog.Info("watcher lost events, scanning all folders")
+			err = ix.ScanAll(ctx)
+		} else {
+			err = ix.Changed(ctx, b.Paths)
+		}
+		if err != nil && ctx.Err() == nil {
+			slog.Warn("handling file changes failed", "err", err)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	ix.mu.Lock()
+	ix.watch = w
+	ix.mu.Unlock()
+	ix.RefreshWatch(ctx)
+	<-ctx.Done()
+	ix.mu.Lock()
+	ix.watch = nil
+	ix.mu.Unlock()
+	return w.Close()
+}
+
+// RefreshWatch points the watcher at the current collection folders, e.g.
+// after a collection was added or removed.
+func (ix *Indexer) RefreshWatch(ctx context.Context) {
+	ix.mu.Lock()
+	w := ix.watch
+	ix.mu.Unlock()
+	if w == nil {
+		return
+	}
+	folders, err := ix.st.AllFolders(ctx)
+	if err != nil {
+		slog.Warn("watcher: listing folders failed", "err", err)
+		return
+	}
+	roots := make([]string, 0, len(folders))
+	for _, f := range folders {
+		roots = append(roots, f.Path)
+	}
+	if err := w.SetRoots(roots); err != nil {
+		slog.Warn("watcher: some folders are not watched; the periodic scan covers them", "err", err)
+	}
+}
+
+// Changed handles paths the watcher reported: changed or new files go to
+// the front of the queue, deleted files and folders leave the index, and a
+// new or moved-in folder has its collection scanned.
+func (ix *Indexer) Changed(ctx context.Context, paths []string) error {
+	rescan, err := ix.changed(ctx, paths)
+	if err != nil {
+		return err
+	}
+	if len(rescan) == 0 {
+		return nil
+	}
+	colls, err := ix.st.Collections(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, c := range colls {
+		if rescan[c.ID] {
+			errs = append(errs, ix.ScanCollection(ctx, c))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (ix *Indexer) changed(ctx context.Context, reported []string) (rescan map[string]bool, err error) {
+	ix.scanning.Lock()
+	defer ix.scanning.Unlock()
+	folders, err := ix.st.AllFolders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rescan = map[string]bool{}
+	todo := map[string][]string{}
+	changed := false
+	for _, p := range reported {
+		root, collID := "", ""
+		for _, f := range folders {
+			if paths.Within(p, f.Path) && len(f.Path) > len(root) {
+				root, collID = f.Path, f.CollectionID
+			}
+		}
+		if root == "" || ix.skipped(root, p) {
+			continue
+		}
+		info, err := os.Stat(p)
+		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			// Gone: the document itself, or everything below a removed folder.
+			n, err := ix.removeUnder(ctx, collID, p)
+			if err != nil {
+				return nil, err
+			}
+			changed = changed || n > 0
+			continue
+		}
+		if info.IsDir() {
+			rescan[collID] = true
+			continue
+		}
+		if !ingest.Supported(p) || info.Size() > ingest.MaxFileSize {
+			continue
+		}
+		doc, known, err := ix.st.DocumentByPath(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		queue, added, err := ix.check(ctx, p, info, collID, doc, known)
+		if err != nil {
+			return nil, err
+		}
+		changed = changed || added
+		if queue {
+			todo[collID] = append(todo[collID], p)
+		}
+	}
+	if changed && ix.onChange != nil {
+		ix.onChange()
+	}
+	for collID, ps := range todo {
+		ix.Enqueue(ps, collID, true)
+	}
+	return rescan, nil
+}
+
+// skipped reports whether p, below root, lies in a skipped or excluded
+// folder or is a skipped or excluded file.
+func (ix *Indexer) skipped(root, p string) bool {
+	rel, err := filepath.Rel(root, p)
+	if err != nil || rel == "." {
+		return false
+	}
+	parts := strings.Split(rel, string(filepath.Separator))
+	for i, name := range parts {
+		last := i == len(parts)-1
+		switch {
+		case ix.excluded(name):
+			return true
+		case !last && ingest.SkipDir(name):
+			return true
+		case last && ingest.SkipFile(name): // also hidden folders, which start with "."
+			return true
+		}
+	}
+	return false
+}
+
+// removeUnder deletes the document at p or, for a removed folder, every
+// document below it.
+func (ix *Indexer) removeUnder(ctx context.Context, collectionID, p string) (int, error) {
+	docs, err := ix.st.Documents(ctx, collectionID, "")
+	if err != nil {
+		return 0, err
+	}
+	prefix := p + string(filepath.Separator)
+	n := 0
+	for _, d := range docs {
+		if d.Path == p || strings.HasPrefix(d.Path, prefix) {
+			if err := ix.st.DeleteDocument(ctx, d.ID); err != nil {
+				return n, err
+			}
+			n++
+		}
+	}
+	return n, nil
 }
 
 // process indexes one file and records the outcome on its document row.
