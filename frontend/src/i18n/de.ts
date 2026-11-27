@@ -211,6 +211,11 @@ export const de = {
   'setup.formats': 'PDF, Word, Markdown, Text und HTML · Dateien werden nie verändert',
   'model.remote': 'extern: {host}',
   'model.local': 'lokal',
+  'model.noTools': 'kann keine Werkzeuge',
+  'setup.agentLabel': 'Agenten-Modell',
+  'setup.agentSameAsAnswer': 'Wie Antwortmodell',
+  'setup.agentHint': 'Für den Agenten-Modus: plant mehrere Schritte über viele Dokumente und ruft dabei Werkzeuge auf. Braucht ein großes Modell mit Werkzeugaufrufen.',
+  'setup.agentSuggested': 'Empfohlen: {model}.',
 
   'settings.remote': 'Modelle teilweise auf {host}.',
   'settings.local': 'Alles läuft lokal.',

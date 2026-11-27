@@ -20,8 +20,11 @@ type Settings struct {
 	LLM          string `json:"llm"`       // model spec, e.g. "ollama/gemma4:12b"; empty = search only
 	Embedding    string `json:"embedding"` // model spec, e.g. "ollama/bge-m3"
 	EmbeddingDim int    `json:"embeddingDim"`
-	SetupDone    bool   `json:"setupDone"`
-	LogLevel     string `json:"logLevel,omitempty"` // debug | info | warn | error; empty = info
+	// AgentModel is the model spec for the agent mode, which plans and calls
+	// tools; it needs a model with tool calling. Empty = the answer model.
+	AgentModel string `json:"agentModel,omitempty"`
+	SetupDone  bool   `json:"setupDone"`
+	LogLevel   string `json:"logLevel,omitempty"` // debug | info | warn | error; empty = info
 
 	// GPUStackURL is an OpenAI-compatible API base (GPUStack, LM Studio,
 	// llama.cpp), e.g. https://gpu.example/v1. Its API key lives in the

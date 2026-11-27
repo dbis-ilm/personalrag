@@ -62,6 +62,8 @@ var catalog = map[string]entry{
 	"conn.gpustack":          {"GPUStack: %w", "GPUStack: %w"},
 	"conn.ollamaInUse":       {"Ein gewähltes Modell läuft über Ollama. Wähle zuerst andere Modelle", "A selected model runs on Ollama. Choose other models first"},
 	"conn.ollamaOff":         {"Ollama ist ausgeschaltet. Trage die Ollama-Adresse ein oder wähle ein anderes Modell", "Ollama is turned off. Enter the Ollama address or choose another model"},
+	"conn.modelCheckFailed":  {"Modell %s lässt sich nicht prüfen: %s", "Model %s cannot be checked: %s"},
+	"conn.noTools":           {"%s kann keine Werkzeuge aufrufen und eignet sich daher nicht für den Agenten-Modus", "%s cannot call tools and so does not suit the agent mode"},
 	"conn.noProvider":        {"Mindestens ein Anbieter ist nötig: eine Ollama-Adresse oder ein GPUStack-Server", "At least one provider is needed: an Ollama address or a GPUStack server"},
 	"conn.gpustackInUse":     {"Ein gewähltes Modell läuft über GPUStack. Wähle zuerst andere Modelle", "A selected model runs on GPUStack. Choose other models first"},
 	"conn.gpustackMissing":   {"GPUStack ist nicht eingerichtet", "GPUStack is not set up"},

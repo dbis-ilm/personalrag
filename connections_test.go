@@ -263,3 +263,78 @@ func TestOllamaOffWhileInUse(t *testing.T) {
 		t.Fatalf("Ollama turned off with its model in use: %v", err)
 	}
 }
+
+// fakeOllama answers /api/tags and /api/show for two models: one that can
+// call tools and one that cannot.
+func fakeOllama(t *testing.T) string {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/tags", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"models":[{"name":"qwen3.6:27b","size":1,"capabilities":["completion","tools"]},{"name":"tiny:1b","size":1,"capabilities":["completion"]},{"name":"bge-m3:latest","size":1,"capabilities":["embedding"]}]}`))
+	})
+	mux.HandleFunc("POST /api/show", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Model string }
+		json.NewDecoder(r.Body).Decode(&req)
+		switch req.Model {
+		case "qwen3.6:27b":
+			w.Write([]byte(`{"capabilities":["completion","tools"]}`))
+		case "tiny:1b":
+			w.Write([]byte(`{"capabilities":["completion"]}`))
+		default:
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
+func TestAgentModel(t *testing.T) {
+	s := startService(t)
+	ollama := fakeOllama(t)
+	gpu := fakeGPUStack(t, "sk-secret")
+	if err := s.SaveConnections(ollama, gpu, "sk-secret", false); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "core restart", 10*time.Second, func() bool { return s.Status().Ready })
+
+	rt := s.RuntimeInfo()
+	tools := map[string]bool{}
+	for _, p := range rt.Providers {
+		for _, m := range p.Models {
+			tools[m.Spec] = m.Tools
+		}
+	}
+	if !tools["ollama/qwen3.6:27b"] || tools["ollama/tiny:1b"] || !tools["gpustack/qwen3-8b"] || tools["gpustack/bge-m3"] {
+		t.Fatalf("tool flags: %v", tools)
+	}
+	if rt.SuggestedAgent != "ollama/qwen3.6:27b" {
+		t.Errorf("suggested agent %q", rt.SuggestedAgent)
+	}
+
+	if err := s.SaveAgentModel("ollama/tiny:1b", false); err == nil || !strings.Contains(err.Error(), "keine Werkzeuge") {
+		t.Fatalf("model without tools accepted: %v", err)
+	}
+	if err := s.SaveAgentModel("ollama/qwen3.6:27b", false); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, _ := config.Load(s.dataDir); cfg.AgentModel != "ollama/qwen3.6:27b" || s.RuntimeInfo().AgentModel != "ollama/qwen3.6:27b" {
+		t.Fatalf("agent model not saved: %q", cfg.AgentModel)
+	}
+	// An agent model on Ollama keeps Ollama from being turned off.
+	if err := s.SaveConnections("", gpu, "", false); err == nil || !strings.Contains(err.Error(), "über Ollama") {
+		t.Fatalf("Ollama turned off while the agent model uses it: %v", err)
+	}
+	if err := s.SaveAgentModel("gpustack/qwen3-8b", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveConnections(ollama, "", "", false); err == nil || !strings.Contains(err.Error(), "GPUStack") {
+		t.Fatalf("GPUStack removed while the agent model uses it: %v", err)
+	}
+	if err := s.SaveAgentModel("", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveAgentModel("foo/bar", false); err == nil {
+		t.Fatal("unknown provider accepted")
+	}
+}
