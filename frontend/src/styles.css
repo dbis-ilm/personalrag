@@ -309,3 +309,21 @@ mark.term { background: transparent; color: var(--accent-text); font-weight: 650
 .more-btn { align-self: flex-start; margin-top: 4px; }
 .more-row { display: flex; align-items: center; gap: 8px; }
 .source-grid .source-rest { grid-column: 1 / -1; order: 1; font-size: 12px; }
+
+/* ---------- Sharing ---------- */
+.share { position: relative; }
+.share-menu {
+  position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 30; min-width: 220px;
+  display: flex; flex-direction: column; padding: 4px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
+}
+.share-menu button { text-align: left; border: 0; background: transparent; color: var(--text); padding: 8px 10px; border-radius: 7px; font-size: 13px; }
+.share-menu button:hover, .share-menu button:focus-visible { background: var(--hover); }
+.print-area { display: none; }
+@media print {
+  #root, .toasts { display: none !important; }
+  html, body { background: #fff !important; color: #000; height: auto; overflow: visible; }
+  .print-area { display: block; font: 11pt/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: #000; }
+  .print-area h3 { font-size: 12pt; margin: 18pt 0 6pt; }
+  .print-area p, .print-area li { margin: 0 0 6pt; }
+}

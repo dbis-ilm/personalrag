@@ -77,6 +77,9 @@ var catalog = map[string]entry{
 	"conn.serverStatus":      {"Server antwortet mit %s", "Server answered with %s"},
 	"conn.unreachable":       {"nicht erreichbar", "not reachable"},
 
+	// Sharing
+	"share.mailTruncated": {"Für die E-Mail gekürzt. Vollständig über „Kopieren“ oder „Als Datei speichern“.", "Shortened for e-mail. Use “Copy” or “Save as file” for the full text."},
+
 	// Agents view: how each client is set up
 	"client.opencode":      {"In opencode.json im Projekt oder in ~/.config/opencode/opencode.json eintragen.", "Add to opencode.json in the project or to ~/.config/opencode/opencode.json."},
 	"client.claudeDesktop": {"In claude_desktop_config.json eintragen und Claude Desktop neu starten.", "Add to claude_desktop_config.json and restart Claude Desktop."},
