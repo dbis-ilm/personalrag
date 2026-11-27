@@ -10,7 +10,7 @@ It is built with [Wails v3](https://v3.wails.io) (Go backend, React/TypeScript U
 
 ## Features
 
-- **Folders as collections.** Add a folder (dialog or drag and drop) and it becomes a collection. New, changed and deleted files are picked up on start, every 15 minutes and on demand; unchanged files are skipped by size, modification time and content hash.
+- **Folders as collections.** Add a folder (dialog or drag and drop) and it becomes a collection. A file system watcher (FSEvents on macOS, fsnotify on Windows and Linux) picks up new, changed and deleted files within a few seconds; a full scan on start, every 15 minutes and on demand catches anything it missed. Unchanged files are skipped by size, modification time and content hash.
 - **Formats:** PDF, Word (.docx), Markdown, plain text and HTML. Scanned PDFs without a text layer are flagged as needing OCR instead of being indexed empty.
 - **Hybrid search:** vector search (sqlite-vec) and full-text search (SQLite FTS5) merged with Reciprocal Rank Fusion. Search works without an answer model.
 - **Cited answers:** the top passages are reranked by the model, the answer streams in with `[n]` citations, and each citation opens its source passage. A confidence rating says how well the sources matched.
@@ -20,7 +20,7 @@ It is built with [Wails v3](https://v3.wails.io) (Go backend, React/TypeScript U
 - **English and German:** the UI follows the system language and can be switched in Settings. Answers come in the language of the question, whatever language the documents are in. Texts for agents (MCP) are always English.
 - **Desktop behaviour:** runs in the menu bar / notification area, closing the window keeps indexing, one instance per data directory, light and dark mode.
 
-Planned next: a file system watcher, OCR, MCP over HTTP for the running app, signed installers. See [Roadmap](#roadmap).
+Planned next: OCR, MCP over HTTP for the running app, signed installers. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -195,7 +195,7 @@ To change the icon, edit the SVGs in `build/icon-src`, render `build/appicon.png
 ## Roadmap
 
 1. **Foundation and Windows:** run and test on Windows hardware; CI on both platforms.
-2. **Index and answer quality:** file system watcher, cloud placeholders (iCloud, OneDrive), evaluation on a real corpus, OCR, more formats (.eml, .pptx, .xlsx), filters by file type and date.
+2. **Index and answer quality:** ~~file system watcher~~ (done), cloud placeholders (iCloud, OneDrive), evaluation on a real corpus, OCR, more formats (.eml, .pptx, .xlsx), filters by file type and date.
 3. **MCP for agents:** stdio server with read-only tools, per-collection sharing and access log are done; next: Streamable HTTP for the running app with token and origin checks.
 4. **Distribution:** signed and notarised macOS package, Windows installer, update notice, autostart, quick-ask window.
 
