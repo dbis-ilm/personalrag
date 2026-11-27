@@ -327,12 +327,14 @@ tasks:
       PORT: "{{.PORT}}"
 
   setup:docker:
-    summary: Builds Docker image for cross-compilation (~800MB download)
+    summary: Builds Docker image for cross-compilation (~1 GB download)
     desc: |
-      Builds the Docker image needed for cross-compiling to any platform.
-      Run this once to enable cross-platform builds from any OS.
+      Builds the self-contained wails-cross image: Go, Node.js (Debian), Wails CLI,
+      Zig + macOS SDK, GTK/WebKit dev packages. The host needs only Docker;
+      no Go, Node or wails3 required. Run this once to enable cross-platform
+      builds from any OS.
     cmds:
-      - docker build -t wails-cross -f build/docker/Dockerfile.cross build/docker/
+      - docker build -t wails-cross -f Dockerfile .
     preconditions:
       - sh: docker info > /dev/null 2>&1
         msg: "Docker is required. Please install Docker first."

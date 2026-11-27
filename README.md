@@ -70,6 +70,25 @@ wails3 task windows:build ARCH=arm64    # for Windows on ARM, e.g. a Windows 11 
 
 A cross-build only compiles; the Go tests do not run on Windows. For an installer instead of the bare `.exe`, install NSIS (`brew install makensis`) and run `wails3 task windows:create:nsis:installer ARCH=amd64`; it bundles the WebView2 bootstrapper for Windows 10 (not yet tested). Building regenerates the icons, which rewrites `build/darwin/Assets.car` with different bytes; `git checkout -- build/darwin/Assets.car` restores it.
 
+### Building all platforms with Docker
+
+A self-contained Docker image can build for every target from any host that has Docker – no Go, Node or Wails CLI on the host required:
+
+```sh
+wails3 task setup:docker              # build the image once (~1 GB download), same as: docker build -t wails-cross .
+
+docker run --rm -v $(pwd):/app wails-cross darwin arm64     # macOS Apple Silicon
+docker run --rm -v $(pwd):/app wails-cross darwin amd64     # macOS Intel
+docker run --rm -v $(pwd):/app wails-cross linux amd64      # Linux x64
+docker run --rm -v $(pwd):/app wails-cross linux arm64      # Linux ARM
+docker run --rm -v $(pwd):/app wails-cross windows amd64    # Windows x64
+docker run --rm -v $(pwd):/app wails-cross windows arm64    # Windows ARM
+```
+
+Each run produces `bin/PersonalRAG-<os>-<arch>[.exe]`, owned by you, not root. Adding `-v wails-cross-gomod:/go/pkg/mod -v wails-cross-gocache:/root/.cache/go-build` keeps Go modules and the build cache between runs (`build:all` does). The container builds the frontend itself if `frontend/dist` is missing (on a copy, so your `node_modules` stay as they are); `wails3 task build:all` builds the frontend once on the host and then every target.
+
+Limits: Linux links against the image's own GTK/WebKit, so an image on an Apple Silicon host builds `linux arm64` only; for `linux amd64` build and run the image with `--platform linux/amd64`. The macOS result is a bare, unsigned executable, not an `.app`; bundling, signing and notarisation still need a Mac.
+
 ## Data, privacy and logs
 
 | What | Where |

@@ -1,0 +1,4 @@
+# The cross-build image copies nothing from the build context (its scripts
+# are inline); the repository is mounted at run time instead. Sending none of
+# it keeps `docker build .` fast (no node_modules, bin/ or .git).
+**

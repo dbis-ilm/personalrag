@@ -43,9 +43,47 @@ tasks:
       - task: windows:install:msix:tools
 
   setup:docker:
-    summary: Builds Docker image for cross-compilation (~800MB download)
+    summary: Builds Docker image for cross-compilation (~1 GB download)
+    desc: |
+      Builds the self-contained wails-cross image: Go, Node.js (Debian), Wails CLI,
+      Zig + macOS SDK, GTK/WebKit dev packages. The host needs only Docker;
+      no Go, Node or wails3 required.
     cmds:
       - task: common:setup:docker
+
+  build:all:
+    summary: Builds for all platforms via Docker
+    desc: |
+      Builds PersonalRAG for darwin/arm64, darwin/amd64, windows/amd64,
+      windows/arm64 and Linux for the Docker host's architecture (Linux
+      links against the image's own GTK/WebKit; see the Dockerfile).
+
+      The frontend is built once on the host (needs Go, Node and wails3
+      locally); each Docker run then only compiles the Go binary, reusing
+      the pre-built frontend/dist. Output lands in bin/ as
+      PersonalRAG-<os>-<arch>[.exe].
+
+      Prerequisite: run 'wails3 task setup:docker' once to build the image.
+    preconditions:
+      - sh: docker info > /dev/null 2>&1
+        msg: "Docker is required."
+      - sh: docker image inspect wails-cross > /dev/null 2>&1
+        msg: "Docker image 'wails-cross' not found. Run 'wails3 task setup:docker' first."
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - cmd: |
+          set -e
+          case "$(docker info --format '{{"{{"}}.Architecture{{"}}"}}')" in
+            aarch64|arm64) LINUX=arm64 ;;
+            *) LINUX=amd64 ;;
+          esac
+          for target in "darwin arm64" "darwin amd64" "windows amd64" "windows arm64" "linux $LINUX"; do
+            echo "==> Building $target"
+            docker run --rm -v "{{.ROOT_DIR}}:/app" -v wails-cross-gomod:/go/pkg/mod -v wails-cross-gocache:/root/.cache/go-build -e APP_NAME="{{.APP_NAME}}" wails-cross $target
+          done
+          echo "==> All builds complete:"
+          ls -1 bin/
 
   build:server:
     summary: Builds the application in server mode (no GUI, HTTP server only)
