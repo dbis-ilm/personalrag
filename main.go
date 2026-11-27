@@ -53,6 +53,7 @@ func init() {
 	application.RegisterEvent[AppStatus](EventStatusChanged)
 	application.RegisterEvent[Notice](EventNotice)
 	application.RegisterEvent[ShowAbout](EventShowAbout)
+	application.RegisterEvent[AnswerSources](EventAnswerSources)
 }
 
 func main() {

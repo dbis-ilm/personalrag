@@ -51,6 +51,8 @@ var catalog = map[string]entry{
 	"answer.fallback":     {"keine Quelle eindeutig relevant", "no source clearly relevant"},
 	"answer.used":         {"%d von %d Treffern verwendet", "%d of %d matches used"},
 	"answer.usedBudget":   {"%d von %d Treffern verwendet; %d weitere relevante waren zu lang für die Antwort", "%d of %d matches used; %d more relevant ones were too long for the answer"},
+	"answer.moreDone":     {"%d Quellen zitiert, %d Treffer ausgewertet", "%d sources cited, %d matches evaluated"},
+	"answer.moreNothing":  {"Keine weiteren relevanten Fundstellen (%d Treffer ausgewertet)", "No further relevant passages (%d matches evaluated)"},
 	"answer.interrupted":  {"Antwort wurde nicht fertiggestellt (App beendet).", "The answer was not finished (the app was closed)."},
 
 	// Connections and models

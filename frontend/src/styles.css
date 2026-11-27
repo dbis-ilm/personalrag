@@ -307,3 +307,5 @@ mark.term { background: transparent; color: var(--accent-text); font-weight: 650
 .about-actions { display: flex; justify-content: flex-end; gap: 8px; width: 100%; margin-top: 8px; }
 
 .more-btn { align-self: flex-start; margin-top: 4px; }
+.more-row { display: flex; align-items: center; gap: 8px; }
+.source-grid .source-rest { grid-column: 1 / -1; order: 1; font-size: 12px; }

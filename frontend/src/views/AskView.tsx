@@ -9,7 +9,7 @@ import { fmtNumber, note, t } from '../i18n'
 type Mode = 'answer' | 'search'
 
 // A turn as shown: the stored Turn plus client-only state while it runs.
-type TurnView = Omit<Turn, 'sources'> & { sources: Source[]; searching?: boolean; streaming?: boolean; notice?: string; millis?: number; loadingMore?: boolean }
+type TurnView = Omit<Turn, 'sources'> & { sources: Source[]; searching?: boolean; streaming?: boolean; notice?: string; millis?: number; loadingMore?: boolean; extending?: boolean }
 
 const isMac = document.documentElement.classList.contains('platform-mac')
 const mod = () => (isMac ? '⌘' : t('common.ctrl'))
@@ -86,10 +86,16 @@ export default function AskView({
     const offDone = Events.On('answer:done', (ev) => {
       const d = ev.data
       setTurns((ts) => ts.map((t) => (t.id === d.turnId
-        ? { ...t, streaming: false, done: true, confidence: d.confidence, note: d.note, error: d.error }
+        ? { ...t, streaming: false, extending: false, done: true, confidence: d.confidence, note: d.note, error: d.error, hasMore: d.hasMore }
         : t)))
     })
-    return () => { offChunk(); offDone() }
+    // Sources added by "evaluate all further matches" arrive before the
+    // text that cites them.
+    const offSources = Events.On('answer:sources', (ev) => {
+      const { turnId, sources } = ev.data
+      setTurns((ts) => ts.map((t) => (t.id === turnId ? { ...t, sources: [...t.sources, ...(sources ?? [])] } : t)))
+    })
+    return () => { offChunk(); offDone(); offSources() }
   }, [])
 
   useEffect(() => {
@@ -164,6 +170,19 @@ export default function AskView({
       if (added.length === 0) toast(t('ask.noMore'))
     } catch (e) {
       patch({ loadingMore: false })
+      toast(errorText(e), 'error')
+    }
+  }
+
+  // askMore evaluates the matches beyond the first page and extends the
+  // answer; progress arrives as answer events.
+  const askMore = async (turn: TurnView) => {
+    if (turn.extending) return
+    setTurns((ts) => ts.map((x) => (x.id === turn.id ? { ...x, extending: true, streaming: true } : x)))
+    try {
+      await AppService.AskMore(turn.id)
+    } catch (e) {
+      setTurns((ts) => ts.map((x) => (x.id === turn.id ? { ...x, extending: false, streaming: false } : x)))
       toast(errorText(e), 'error')
     }
   }
@@ -276,6 +295,9 @@ export default function AskView({
 
                   {turn.mode === 'answer' ? (
                     <div className="source-grid">
+                      {turn.sources.length > 4 && (
+                        <span className="muted source-rest">{t('ask.moreSources', { count: turn.sources.length - 4 })}</span>
+                      )}
                       {turn.sources.slice(0, 4).map((s, i) => (
                         <button key={s.chunkId} type="button" className="source-card" aria-pressed={active.turn === ti && active.src === i} onClick={() => show(ti, i)}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -332,6 +354,17 @@ export default function AskView({
                         </span>
                         <div style={{ flex: 1 }} />
                         <button type="button" className="btn" onClick={() => navigator.clipboard?.writeText(turn.answer).then(() => toast(t('ask.copied')))}>{t('common.copy')}</button>
+                      </div>
+                    )}
+                    {(turn.extending || (turn.done && turn.hasMore && !turn.error)) && (
+                      <div className="more-row" aria-live="polite">
+                        {turn.extending
+                          ? <span className="muted" style={{ fontSize: 12.5 }}>{t('ask.extending', { count: turn.sources.length })}</span>
+                          : (
+                            <button type="button" className="btn" onClick={() => askMore(turn)} title={t('ask.askMoreHint')}>
+                              <Icon name="search" size={13} strokeWidth={2.2} />{t('ask.askMore')}
+                            </button>
+                          )}
                       </div>
                     )}
                   </div>
