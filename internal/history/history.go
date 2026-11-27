@@ -154,6 +154,26 @@ func scanTurn(sc interface{ Scan(...any) error }) (Turn, error) {
 	return t, err
 }
 
+// RecentQuestions returns the questions asked, newest first, each once
+// (by its latest use), across all conversations.
+func (s *Store) RecentQuestions(ctx context.Context, limit int) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT question FROM turns
+		GROUP BY question ORDER BY MAX(id) DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var q string
+		if err := rows.Scan(&q); err != nil {
+			return nil, err
+		}
+		out = append(out, q)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) Turn(ctx context.Context, id int64) (Turn, error) {
 	t, err := scanTurn(s.db.QueryRowContext(ctx, `SELECT `+turnCols+` FROM turns WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {

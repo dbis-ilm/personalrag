@@ -5,6 +5,7 @@ import Icon from '../components/Icon'
 import { toast } from '../components/Toasts'
 import { errorText } from '../App'
 import { fmtNumber, note, t } from '../i18n'
+import { caretAllows, emptyHistory, navigate, remember } from '../questionHistory'
 
 type Mode = 'answer' | 'search'
 
@@ -30,6 +31,7 @@ export default function AskView({
 }) {
   const [mode, setMode] = useState<Mode>(searchOnly ? 'search' : 'answer')
   const [draft, setDraft] = useState('')
+  const asked = useRef(emptyHistory()) // earlier questions for Up/Down
   const [turns, setTurns] = useState<TurnView[]>([])
   const turnsRef = useRef<TurnView[]>([])
   turnsRef.current = turns
@@ -51,6 +53,10 @@ export default function AskView({
   }
 
   useEffect(() => { if (searchOnly) setMode('search') }, [searchOnly])
+
+  useEffect(() => {
+    AppService.RecentQuestions().then((l) => { asked.current = emptyHistory(l ?? []) }).catch(() => {})
+  }, [])
 
   // Load a stored conversation when the sidebar selects one.
   useEffect(() => {
@@ -129,6 +135,7 @@ export default function AskView({
     if (!q || busy) return
     const m = mode
     setDraft('')
+    asked.current = remember(asked.current, q)
     const placeholder: TurnView = {
       id: -Date.now(), question: q, standalone: '', mode: m, sources: [], hasMore: false, answer: '', confidence: '', note: '', error: '', done: false, searching: true,
     }
@@ -188,6 +195,21 @@ export default function AskView({
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
+      const dir = e.key === 'ArrowUp' ? 'up' : 'down'
+      const el = e.currentTarget
+      const step = caretAllows(el.value, el.selectionStart, el.selectionEnd, dir) ? navigate(asked.current, dir, draft) : null
+      if (step) {
+        e.preventDefault()
+        asked.current = step.state
+        setDraft(step.text)
+        requestAnimationFrame(() => {
+          const n = inputRef.current
+          if (n) n.selectionStart = n.selectionEnd = n.value.length
+        })
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       run(draft)
@@ -381,8 +403,8 @@ export default function AskView({
             <label htmlFor="q" className="sr-only">{turns.length ? t('ask.followupLabel') : t('ask.questionLabel')}</label>
             <textarea
               id="q" ref={inputRef} rows={1} value={draft} autoFocus disabled={!hasCollections}
-              placeholder={!hasCollections ? t('ask.addFolderFirst') : `${turns.length ? t('ask.askFollowup') : t('ask.ask')} … (${t('ask.sendHint')}${searchOnly ? '' : `, ${MOD} K ${t('ask.searchOnly')}`})`}
-              onChange={(e) => setDraft(e.target.value)} onKeyDown={onKeyDown}
+              placeholder={!hasCollections ? t('ask.addFolderFirst') : `${turns.length ? t('ask.askFollowup') : t('ask.ask')} … (${t('ask.sendHint')}, ${t('ask.historyHint')}${searchOnly ? '' : `, ${MOD} K ${t('ask.searchOnly')}`})`}
+              onChange={(e) => { setDraft(e.target.value); asked.current = { ...asked.current, index: -1 } }} onKeyDown={onKeyDown}
             />
             <button type="submit" className="send" aria-label={t('ask.send')} disabled={!draft.trim() || busy}>
               <Icon name="send" strokeWidth={2} />
