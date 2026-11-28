@@ -324,7 +324,11 @@ func TestDemoBench(t *testing.T) {
 				firstPage := benchResult{ok: true}
 				checkDocuments(c, docs(first), &firstPage, "erste Seite")
 				o.details = append(o.details, firstPage.details...)
-				checkDocuments(c, docs(res.Results), &o, fmt.Sprintf("mit „Mehr anzeigen“ (%d Treffer)", len(res.Results)))
+				// After "show more" nearly every document appears; distractors
+				// only matter on the first page.
+				all := c
+				all.Expect.Distractors = nil
+				checkDocuments(all, docs(res.Results), &o, fmt.Sprintf("mit „Mehr anzeigen“ (%d Treffer)", len(res.Results)))
 			}
 			row(c, "–", o, time.Since(began))
 

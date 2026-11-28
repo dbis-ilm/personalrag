@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"image"
 	"image/draw"
@@ -121,12 +122,14 @@ func (l *layout) wrap(s string, width, size float64, bold bool) []string {
 	return lines
 }
 
+// newPDF starts a PDF whose bytes depend only on its content. Streams stay
+// uncompressed: compress/flate output differs between Go versions.
 func newPDF(title string) *fpdf.Fpdf {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetCreationDate(fixedDate)
 	pdf.SetModificationDate(fixedDate)
 	pdf.SetCatalogSort(true)
-	pdf.SetCompression(true)
+	pdf.SetCompression(false)
 	pdf.SetAutoPageBreak(false, 0)
 	pdf.SetTitle(title, true)
 	pdf.SetCreator("PersonalRAG demogen", true)
@@ -157,8 +160,20 @@ func (l *layout) writePDF(path, title string) error {
 	return pdf.OutputFileAndClose(path)
 }
 
+// Fingerprint identifies the layout's content: pages, runs and footer.
+func (l *layout) Fingerprint() string {
+	h := sha256.New()
+	fmt.Fprintf(h, "%d|%s\n", l.pages, l.footer)
+	for _, r := range l.runs {
+		fmt.Fprintf(h, "%d|%.3f|%.3f|%.1f|%v|%s\n", r.page, r.x, r.y, r.size, r.bold, r.text)
+	}
+	return fmt.Sprintf("layout:%x", h.Sum(nil))
+}
+
 // writeScan renders the layout as a scanned document: each page an image
-// at scanDPI, no text layer, so only OCR can read it.
+// at scanDPI, no text layer, so only OCR can read it. Rasterising and PNG
+// compression differ slightly between platforms and Go versions, so the
+// layout's fingerprint goes into the keywords; tests compare that.
 func (l *layout) writeScan(path, title string) error {
 	faces := map[string]font.Face{}
 	face := func(size float64, bold bool) (font.Face, error) {
@@ -184,6 +199,7 @@ func (l *layout) writeScan(path, title string) error {
 	px := func(mm float64) int { return int(mm / 25.4 * scanDPI) }
 
 	pdf := newPDF(title)
+	pdf.SetKeywords(l.Fingerprint(), false)
 	for p := 1; p <= l.pages; p++ {
 		// fpdf orders images by width only, ties in map order; one more
 		// pixel column per page keeps the output byte-identical.

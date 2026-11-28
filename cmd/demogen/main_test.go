@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -14,6 +15,8 @@ import (
 )
 
 const committed = "../../demo"
+
+var scanFingerprint = regexp.MustCompile(`layout:[0-9a-f]{64}`)
 
 // The committed corpus must be what the generator writes; otherwise a
 // benchmark would check answers against stale expectations.
@@ -44,6 +47,14 @@ func TestCorpusUpToDate(t *testing.T) {
 	for _, rel := range want {
 		a, _ := os.ReadFile(filepath.Join(dir, rel))
 		b, _ := os.ReadFile(filepath.Join(committed, rel))
+		// Scans carry their layout's fingerprint; their pixels may differ
+		// between platforms.
+		if fa := scanFingerprint.Find(a); fa != nil {
+			if !bytes.Equal(fa, scanFingerprint.Find(b)) {
+				t.Errorf("demo/%s is out of date; run go run ./cmd/demogen", filepath.ToSlash(rel))
+			}
+			continue
+		}
 		if !bytes.Equal(a, b) {
 			t.Errorf("demo/%s is out of date; run go run ./cmd/demogen", filepath.ToSlash(rel))
 		}
