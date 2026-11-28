@@ -97,7 +97,7 @@ func TestMCPOverStdio(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	sort.Strings(names)
-	if strings.Join(names, ",") != "extract,list_collections,list_documents,read_document,search_documents" {
+	if strings.Join(names, ",") != "check,extract,list_collections,list_documents,read_document,search_documents" {
 		t.Fatalf("tools: %v", names)
 	}
 	if !strings.Contains(cs.InitializeResult().Instructions, "list_documents") {

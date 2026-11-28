@@ -97,6 +97,7 @@ export const en: Record<keyof typeof de, string> = {
   'tool.read_document': 'Read document',
   'tool.search_documents': 'Search',
   'tool.extract': 'Extract',
+  'tool.check': 'Check',
   'tool.calc': 'Calculate',
   'ask.noHits': 'No matching passages found. Try other words or another collection.',
   'ask.relevance': 'Relevance {pct}%',

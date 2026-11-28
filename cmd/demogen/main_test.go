@@ -36,7 +36,7 @@ func TestCorpusUpToDate(t *testing.T) {
 	})
 	var have []string
 	filepath.WalkDir(committed, func(p string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && d.Name() != "README.md" {
+		if err == nil && !d.IsDir() && d.Name() != "README.md" && !strings.HasPrefix(d.Name(), ".") { // not the README, nor files the file manager adds (.DS_Store)
 			rel, _ := filepath.Rel(committed, p)
 			have = append(have, rel)
 		}

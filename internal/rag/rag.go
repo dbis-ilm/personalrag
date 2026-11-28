@@ -61,15 +61,17 @@ type Answer struct {
 }
 
 type Engine struct {
-	g         *genkit.Genkit
-	st        *store.Store
-	llm       ai.Model
-	llmConfig any
-	rerank    ai.Prompt
-	qa        ai.Prompt
-	qaMore    ai.Prompt
-	condense  ai.Prompt
-	extract   ai.Prompt
+	g          *genkit.Genkit
+	st         *store.Store
+	llm        ai.Model
+	llmConfig  any
+	rerank     ai.Prompt
+	qa         ai.Prompt
+	qaMore     ai.Prompt
+	condense   ai.Prompt
+	extract    ai.Prompt
+	checkRules ai.Prompt
+	checkFacts ai.Prompt
 }
 
 // New wires the engine. llm may be nil (search-only mode).
@@ -80,8 +82,10 @@ func New(g *genkit.Genkit, st *store.Store, llm ai.Model, llmConfig any) (*Engin
 	e.qaMore = genkit.LookupPrompt(g, "qa_more")
 	e.condense = genkit.LookupPrompt(g, "condense")
 	e.extract = genkit.LookupPrompt(g, "extract")
-	if e.rerank == nil || e.qa == nil || e.qaMore == nil || e.condense == nil || e.extract == nil {
-		return nil, errors.New("prompts rerank/qa/qa_more/condense/extract not loaded")
+	e.checkRules = genkit.LookupPrompt(g, "check_rules")
+	e.checkFacts = genkit.LookupPrompt(g, "check_facts")
+	if e.rerank == nil || e.qa == nil || e.qaMore == nil || e.condense == nil || e.extract == nil || e.checkRules == nil || e.checkFacts == nil {
+		return nil, errors.New("prompts rerank/qa/qa_more/condense/extract/check_rules/check_facts not loaded")
 	}
 	return e, nil
 }
@@ -355,6 +359,41 @@ func (e *Engine) ExtractPart(ctx context.Context, instruction, document, part, t
 		"part":        part,
 		"text":        askyourdocs.WrapUntrusted("document", text),
 	})...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(resp.Text()), nil
+}
+
+// CheckRulesPart asks the answer model for the checkable rules in one part
+// of a rule document; scope says which rules count (may be empty). The
+// answer is JSON, see the check_rules prompt.
+func (e *Engine) CheckRulesPart(ctx context.Context, scope, document, part, text string) (string, error) {
+	return e.runPrompt(ctx, e.checkRules, map[string]any{
+		"scope":    askyourdocs.SanitizeUntrusted(scope),
+		"document": askyourdocs.SanitizeUntrusted(document),
+		"part":     part,
+		"text":     askyourdocs.WrapUntrusted("document", text),
+	})
+}
+
+// CheckFactsPart asks the answer model for the values of questions (one
+// "name: question" per line) in one part of the checked document. The
+// answer is JSON, see the check_facts prompt.
+func (e *Engine) CheckFactsPart(ctx context.Context, questions, document, part, text string) (string, error) {
+	return e.runPrompt(ctx, e.checkFacts, map[string]any{
+		"questions": askyourdocs.SanitizeUntrusted(questions),
+		"document":  askyourdocs.SanitizeUntrusted(document),
+		"part":      part,
+		"text":      askyourdocs.WrapUntrusted("document", text),
+	})
+}
+
+func (e *Engine) runPrompt(ctx context.Context, p ai.Prompt, in map[string]any) (string, error) {
+	if e.llm == nil {
+		return "", errors.New("kein Antwortmodell eingerichtet")
+	}
+	resp, err := p.Execute(ctx, askyourdocs.PromptOptions(e.llm, e.llmConfig, in)...)
 	if err != nil {
 		return "", err
 	}

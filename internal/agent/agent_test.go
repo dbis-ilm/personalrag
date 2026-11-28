@@ -48,6 +48,8 @@ func fakeModel(g *genkit.Genkit) ai.Model {
 
 type fixture struct {
 	cs  *mcp.ClientSession
+	srv *Server
+	g   *genkit.Genkit
 	st  *store.Store
 	ids map[string]int64 // file name → document id
 }
@@ -116,7 +118,8 @@ func setupWith(t *testing.T, extra map[string][]byte) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := New(st, eng, "test").MCP()
+	server := New(st, eng, "test")
+	srv := server.MCP()
 	ct, stt := mcp.NewInMemoryTransports()
 	if _, err := srv.Connect(ctx, stt, nil); err != nil {
 		t.Fatal(err)
@@ -126,7 +129,7 @@ func setupWith(t *testing.T, extra map[string][]byte) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { cs.Close() })
-	return &fixture{cs: cs, st: st, ids: ids}
+	return &fixture{cs: cs, srv: server, g: g, st: st, ids: ids}
 }
 
 // call invokes a tool and decodes its JSON result into out; it returns the

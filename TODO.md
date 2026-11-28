@@ -7,12 +7,10 @@ Open work on PersonalRAG, roughly by priority. Done items are removed; the histo
 The in-app agent and the MCP server offer `list_collections`, `list_documents`, `read_document`, `search_documents` and `extract` (the in-app agent also `calc`). `extract` runs the local answer model with a
 prompt that forbids inventing anything. Two kinds of task are not covered well; the demo benchmark (`demo/cases.yaml`) shows both.
 
-- [ ] **`check`: compare a document against rules from other documents.**
-  In the benchmark, gemma4:12b "checked" the thesis with one search call, never read it and missed two of three violations. `check(document_id, reference_document_id | reference_query + reference_collection_id, instruction)` loads the document and the rules and lets the local model report per rule: met / violated / cannot tell, with reason and page. New `check.prompt`; cache key over model, instruction, document text and reference text.
+- [ ] **`check`: qualitative rules and rule search.** `check(document_id, reference_document_id)` decides rules with a number or a required item (length, sources, declaration) in code; every other rule (style, language, structure) is reported as "cannot tell". Left: let the local model judge those with reason and page (risk: rules wrongly reported as violated, see the benchmark), take rules from a search (`reference_query` + `reference_collection_id`) instead of one document, and run the benchmark case `pruefung-regeln`.
 - [ ] **`generate`: create content from a document with the local model**
   (exam questions, summaries, explanations). Grounded in the document, own additions marked, page references; injection protection as for `extract`. Needed above all with "document text stays on this computer", where the agent has no `read_document` and `extract` may not generate: exam questions are impossible there today. Separate cache namespace.
-- [ ] Offer both in the in-app agent and over MCP; describe them in the agent instructions; keep them atomic (one tool, one step).
-- [ ] Agent guidance: rule checks and comparisons read the whole documents (or use `check`), not search snippets.
+- [ ] Offer `generate` in the in-app agent and over MCP; describe it in the agent instructions; keep it atomic (one tool, one step).
 - [ ] Lower priority: `query_document(document_id, question, pages?)`, a discursive answer about one document with page references. The answer mode with a collection in scope covers most of it.
 - [ ] Later: stream long `generate` results (MCP progress notifications).
 - [ ] Store agent steps with the turn, so they survive a restart.
@@ -20,13 +18,10 @@ prompt that forbids inventing anything. Two kinds of task are not covered well; 
 
 ### Starlark (`calc`)
 
-`calc` is the only place Starlark runs today (`internal/agent/loop.go`): sandboxed, step limit, no files or network, data through `outputs`. The model still triggers every `extract` as its own turn, so a task over 40 documents is 40+ turns (limit: `agentMaxTurns` = 60) and weak models stop halfway or count in their head.
+`calc` is the only place Starlark runs today (`internal/agent/calc.go`): sandboxed, step limit, no files or network, data through `outputs`, the document tools as functions (`list_documents`, `extract`, …), so one script can cover every document instead of one model turn each, a per-run `state` dict, `math`, `time` and the helpers `normalize_name`, `count_by` and `table`.
 
-- [ ] **Tools as Starlark builtins.** Expose `list_documents`, `search_documents`, `extract` and `read_document` in `calc`'s `predeclared`, so one script does `for d in list_documents(...): extract(d, ...)`, counts and returns the table: one tool call instead of 40+. Call the same Go functions as the tools, so sharing checks, "document text stays on this computer" and the access log stay as they are. Every builtin call still emits `agent:step`; a failing document becomes an error value, the script goes on. `extract` is slow and the step limit does not count wall time: cancellation through the context must keep working (Stop button). Change `agentSystem` to "for all documents: one `calc` script with an `extract` loop". Run the benchmark before and after with qwen3.6:27b and gemma4:12b.
-- [ ] **State across `calc` calls.** Each call starts empty. A per-run `state` dict (like the notebook) keeps intermediate results and helper functions, so the model does not retype data; also helps counting reliably.
-- [ ] **More standard library.** Only `json` today. Add `math` and `time` (deadlines, notice periods), and small Go helpers: `normalize_name`, `count_by`, `table()` (Markdown / CSV).
+- [ ] Benchmark the script tools: run the agent cases of `demo/cases.yaml` with qwen3.6:27b and gemma4:12b before and after, and see whether weak models write the loop correctly; adjust `agentSystem` accordingly.
 - [ ] **Files from scripts.** A script builds CSV or `.ics` and the app hands the file to the UI; covers "Reuse results" under Everyday use.
-- [ ] **`check` as hybrid.** The model extracts rules and facts, Starlark evaluates them deterministically (counts, limits, dates): fewer wrong "violated" verdicts than a model-only judgement.
 
 ## Everyday use
 
