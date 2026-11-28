@@ -1,0 +1,728 @@
+%PDF-1.3
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 4 0 R>>
+endobj
+4 0 obj
+<</Length 525>>
+stream
+0 J
+0 j
+0.57 w
+0.000 G
+0.000 g
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 22.00 Tf ET
+BT 56.69 609.45 Td (Database Systems) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 14.00 Tf ET
+BT 56.69 575.43 Td (Lecture Notes, Winter Term 2025/26) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 11.00 Tf ET
+BT 56.69 547.09 Td (Hochschule Musterstadt, Department of Computer Science) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 1 von 9) Tj ET
+
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 6 0 R>>
+endobj
+6 0 obj
+<</Length 5630>>
+stream
+0 J
+0 j
+0.57 w
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+0.000 G
+0.000 g
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 16.00 Tf ET
+BT 56.69 779.53 Td (Contents) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 56.69 751.18 Td (1 Introduction) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 510.24 751.18 Td (3) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 735.59 Td (1.1 Database Systems and Their Tasks) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 735.59 Td (3) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 720.00 Td (1.2 The Three-Schema Architecture) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 720.00 Td (3) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 704.41 Td (1.3 Data Independence) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 704.41 Td (3) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 56.69 688.82 Td (2 The Relational Model and SQL) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 510.24 688.82 Td (4) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 673.23 Td (2.1 Relations and Keys) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 673.23 Td (4) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 657.64 Td (2.2 Relational Algebra) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 657.64 Td (4) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 642.05 Td (2.3 Queries in SQL) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 642.05 Td (4) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 626.46 Td (2.4 Normal Forms) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 626.46 Td (4) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 56.69 610.87 Td (3 Transactions) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 510.24 610.87 Td (5) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 595.28 Td (3.1 The ACID Properties) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 595.28 Td (5) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 579.69 Td (3.2 Serializability) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 579.69 Td (5) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 564.09 Td (3.3 Two-Phase Locking) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 564.09 Td (5) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 548.50 Td (3.4 Deadlocks) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 548.50 Td (5) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 532.91 Td (3.5 Isolation Levels) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 532.91 Td (6) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 517.32 Td (3.6 Logging and Recovery) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 517.32 Td (6) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 56.69 501.73 Td (4 Index Structures) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 510.24 501.73 Td (7) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 486.14 Td (4.1 B+-Trees) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 486.14 Td (7) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 470.55 Td (4.2 Hashing) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 470.55 Td (7) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 454.96 Td (4.3 Bitmap Indexes) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 454.96 Td (7) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 56.69 439.37 Td (5 Query Processing) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 510.24 439.37 Td (8) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 423.78 Td (5.1 Query Optimization) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 423.78 Td (8) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 408.19 Td (5.2 Join Algorithms) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 408.19 Td (8) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 56.69 392.60 Td (6 Distributed Databases) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 11.00 Tf ET
+BT 510.24 392.60 Td (9) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 377.01 Td (6.1 Fragmentation and Replication) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 377.01 Td (9) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 361.42 Td (6.2 Distributed Commit) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 361.42 Td (9) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 56.69 345.83 Td (6.3 The CAP Theorem) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.00 Tf ET
+BT 510.24 345.83 Td (9) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 2 von 9) Tj ET
+
+endstream
+endobj
+7 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 8 0 R>>
+endobj
+8 0 obj
+<</Length 4614>>
+stream
+0 J
+0 j
+0.57 w
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+0.000 G
+0.000 g
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 18.00 Tf ET
+BT 56.69 779.53 Td (1 Introduction) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 745.51 Td (1.1 Database Systems and Their Tasks) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 722.83 Td (A database system consists of a database, the collection of stored data, and a database management) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 708.55 Td (system \(DBMS\), the software that manages it. Applications do not access files directly; they send) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 694.26 Td (requests to the DBMS, which takes care of storage, access paths, concurrency and recovery. This) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 679.98 Td (separation is what allows many users and programs to share the same data safely.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 657.12 Td (Typical tasks of a DBMS are the integration of data into one consistent collection, operations to query) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 642.83 Td (and modify data, a catalog that describes the stored data, user views, integrity constraints, access) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 628.54 Td (control, transactions and recovery after failures. Together these tasks distinguish a database system) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 614.26 Td (from a set of files that each application manages on its own.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 580.06 Td (1.2 The Three-Schema Architecture) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 557.38 Td (The ANSI/SPARC architecture describes a database on three levels. The internal schema defines how) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 543.10 Td (data is stored physically, for example in which files and with which indexes. The conceptual schema) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 528.81 Td (describes the logical structure of the whole database: entities, attributes and relationships. External) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 514.52 Td (schemas define the views that individual user groups or applications see.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 491.66 Td (Mappings connect the levels. A query against an external view is translated into a query against the) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 477.38 Td (conceptual schema and then into operations on the internal level. Because each level only depends on) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 463.09 Td (the mapping to the next one, changes on one level can often be hidden from the levels above.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 428.89 Td (1.3 Data Independence) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 406.22 Td (Physical data independence means that the internal schema can change, for example by adding an) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 391.93 Td (index or moving data to another disk, without changing the conceptual schema or the applications.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 377.64 Td (Logical data independence means that the conceptual schema can be extended, for example by a new) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 363.36 Td (attribute, without changing external views that do not use it.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 340.50 Td (Data independence is the main reason why database applications survive decades of changes in) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 326.21 Td (hardware and storage technology. It is also why query languages are declarative: an application states) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 311.92 Td (which data it needs, not how the DBMS should find it.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 3 von 9) Tj ET
+
+endstream
+endobj
+9 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 10 0 R>>
+endobj
+10 0 obj
+<</Length 5780>>
+stream
+0 J
+0 j
+0.57 w
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+0.000 G
+0.000 g
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 18.00 Tf ET
+BT 56.69 779.53 Td (2 The Relational Model and SQL) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 745.51 Td (2.1 Relations and Keys) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 722.83 Td (In the relational model, data is stored in relations, which are sets of tuples over a fixed list of attributes.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 708.55 Td (Each attribute has a domain of atomic values. A relation schema consists of the relation name and its) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 694.26 Td (attributes; the relation itself is the current set of tuples.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 671.40 Td (A superkey is a set of attributes whose values identify each tuple uniquely. A candidate key is a minimal) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 657.12 Td (superkey, and one candidate key is chosen as the primary key. A foreign key is a set of attributes that) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 642.83 Td (refers to the primary key of another relation; referential integrity requires that every foreign key value) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 628.54 Td (exists in the referenced relation.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 594.35 Td (2.2 Relational Algebra) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 571.67 Td (Relational algebra provides operators that take relations as input and produce relations as output.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 557.38 Td (Selection chooses tuples that satisfy a condition, projection keeps a subset of attributes, and the) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 543.10 Td (Cartesian product combines every tuple of one relation with every tuple of another. Union and) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 528.81 Td (difference work on relations with the same schema, and renaming changes attribute names.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 505.95 Td (The join combines tuples of two relations that agree on given attributes; it can be expressed as a) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 491.66 Td (product followed by a selection. Because every operator returns a relation, expressions can be nested) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 477.38 Td (arbitrarily, which is the basis for query optimization: equivalent expressions can be evaluated at very) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 463.09 Td (different costs.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 428.89 Td (2.3 Queries in SQL) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 406.22 Td (SQL is the standard query language of relational systems. A query has the basic form SELECT) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 391.93 Td (attributes FROM relations WHERE condition. Joins can be written as conditions in the WHERE clause) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 377.64 Td (or with the JOIN keyword. GROUP BY partitions the result into groups, and aggregate functions such) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 363.36 Td (as COUNT, SUM and AVG compute one value per group.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 340.50 Td (Subqueries may appear in the WHERE clause, for example with IN or EXISTS. ORDER BY sorts the) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 326.21 Td (result. Unlike relational algebra, SQL works with multisets: duplicates are kept unless DISTINCT is) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 311.92 Td (specified.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 277.73 Td (2.4 Normal Forms) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 255.05 Td (Normalization avoids redundancy and the update anomalies it causes. A relation is in first normal form) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 240.76 Td (if all attribute values are atomic. It is in second normal form if, in addition, no non-key attribute depends) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 226.48 Td (on only part of a candidate key. Third normal form also excludes transitive dependencies of non-key) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 212.19 Td (attributes on a key.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 189.33 Td (Boyce-Codd normal form requires that the left side of every non-trivial functional dependency is a) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 175.05 Td (superkey. Decomposition into third normal form is always possible without losing information or) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 160.76 Td (dependencies; for Boyce-Codd normal form, preserving all dependencies is not always possible.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 4 von 9) Tj ET
+
+endstream
+endobj
+11 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 12 0 R>>
+endobj
+12 0 obj
+<</Length 6247>>
+stream
+0 J
+0 j
+0.57 w
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+0.000 G
+0.000 g
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 18.00 Tf ET
+BT 56.69 779.53 Td (3 Transactions) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 745.51 Td (3.1 The ACID Properties) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 722.83 Td (A transaction is a sequence of operations that the DBMS treats as one logical unit, for example) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 708.55 Td (transferring money from one account to another. Transactions guarantee four properties, abbreviated) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 694.26 Td (as ACID. Atomicity means that either all operations of a transaction take effect or none does.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 679.98 Td (Consistency means that a transaction transforms a consistent database state into another consistent) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 665.69 Td (state.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 642.83 Td (Isolation means that concurrent transactions do not see each other's intermediate results; the effect is) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 628.54 Td (as if they ran one after another. Durability means that the effects of a committed transaction survive) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 614.26 Td (later failures, including crashes of the system. The concurrency control component ensures isolation;) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 599.97 Td (the recovery component ensures atomicity and durability.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 565.77 Td (3.2 Serializability) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 543.10 Td (A schedule is an interleaving of the operations of several transactions. A schedule is serial if the) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 528.81 Td (transactions run one after another. A schedule is serializable if it has the same effect as some serial) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 514.52 Td (schedule. Two operations conflict if they belong to different transactions, access the same data item) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 500.24 Td (and at least one of them is a write.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 477.38 Td (Conflict serializability can be tested with the conflict graph \(also called precedence graph\): it has a node) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 463.09 Td (for each transaction and an edge from T1 to T2 if an operation of T1 conflicts with a later operation of) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 448.80 Td (T2. A schedule is conflict serializable if and only if its conflict graph is acyclic; a topological order of the) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 434.52 Td (graph gives an equivalent serial schedule.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 400.32 Td (3.3 Two-Phase Locking) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 377.64 Td (Most systems ensure serializability with locks. Before reading a data item, a transaction acquires a) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 363.36 Td (shared lock; before writing it, an exclusive lock. Shared locks are compatible with each other, exclusive) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 349.07 Td (locks are compatible with no other lock. A transaction that requests an incompatible lock has to wait.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 326.21 Td (The two-phase locking protocol \(2PL\) requires that a transaction acquires all its locks before it releases) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 311.92 Td (any lock. Each transaction therefore has a growing phase and a shrinking phase. Every schedule) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 297.64 Td (produced by 2PL is conflict serializable. Strict two-phase locking holds all exclusive locks until the) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 283.35 Td (transaction commits or aborts, which additionally avoids cascading aborts.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 249.15 Td (3.4 Deadlocks) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 226.48 Td (Locking can lead to deadlocks: transaction T1 waits for a lock held by T2, while T2 waits for a lock held) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 212.19 Td (by T1. Neither transaction can continue. Deadlocks are detected with the wait-for graph, which has an) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 197.90 Td (edge from Ti to Tj if Ti waits for a lock held by Tj. A cycle in the wait-for graph is a deadlock.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 175.05 Td (The DBMS resolves a deadlock by aborting one transaction of the cycle, the victim, and restarting it) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 160.76 Td (later. Alternatively, deadlocks can be prevented, for example with timestamps: in the wait-die scheme,) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 146.47 Td (an older transaction may wait for a younger one, while a younger transaction that requests a lock held) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 132.19 Td (by an older one is aborted.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 5 von 9) Tj ET
+
+endstream
+endobj
+13 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 14 0 R>>
+endobj
+14 0 obj
+<</Length 3089>>
+stream
+0 J
+0 j
+0.57 w
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+0.000 G
+0.000 g
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 779.53 Td (3.5 Isolation Levels) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 756.85 Td (Full serializability costs concurrency, so SQL defines weaker isolation levels. Read uncommitted allows) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 742.56 Td (dirty reads of data written by uncommitted transactions. Read committed prevents dirty reads but allows) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 728.28 Td (non-repeatable reads. Repeatable read guarantees that data read once does not change, but) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 713.99 Td (phantoms may appear: new rows that match a query condition.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 691.13 Td (Serializable, the strongest level, prevents all of these anomalies. Many systems implement isolation) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 676.85 Td (with multiversion concurrency control, where readers see a snapshot of the database and do not block) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 662.56 Td (writers.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 628.36 Td (3.6 Logging and Recovery) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 605.68 Td (To guarantee atomicity and durability, the DBMS writes a log of all changes. Each log record contains) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 591.40 Td (the transaction, the changed data item, its old value \(before image\) and its new value \(after image\). The) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 577.11 Td (write-ahead logging rule \(WAL\) requires that a log record is written to stable storage before the) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 562.82 Td (changed data page, and that all log records of a transaction are written before it commits.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 539.97 Td (After a crash, recovery uses the log in two directions. Redo repeats the changes of committed) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 525.68 Td (transactions whose pages had not yet been written; undo reverses the changes of transactions that had) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 511.39 Td (not committed. Checkpoints limit how much of the log has to be read. The ARIES algorithm combines) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 497.11 Td (these steps in an analysis, a redo and an undo phase.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 6 von 9) Tj ET
+
+endstream
+endobj
+15 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 16 0 R>>
+endobj
+16 0 obj
+<</Length 3062>>
+stream
+0 J
+0 j
+0.57 w
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+0.000 G
+0.000 g
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 18.00 Tf ET
+BT 56.69 779.53 Td (4 Index Structures) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 745.51 Td (4.1 B+-Trees) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 722.83 Td (The B+-tree is the standard index structure of relational systems. It is a balanced search tree in which) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 708.55 Td (all data entries are stored in the leaves, which are linked for range scans. Inner nodes only contain) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 694.26 Td (separator keys and pointers. Each node except the root is at least half full, so the height of the tree) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 679.98 Td (grows only logarithmically with the number of entries.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 657.12 Td (Insertion splits a full node and propagates a separator key to the parent; deletion merges or) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 642.83 Td (redistributes nodes that become less than half full. A lookup reads one node per level, typically three or) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 628.54 Td (four pages even for very large tables.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 594.35 Td (4.2 Hashing) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 571.67 Td (Hash indexes compute the bucket of an entry from a hash function of its key. Equality lookups need) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 557.38 Td (only one or two page accesses, but range queries are not supported. Static hashing degrades when) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 543.10 Td (buckets overflow; dynamic schemes such as extendible hashing and linear hashing grow the number of) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 528.81 Td (buckets with the data.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 494.61 Td (4.3 Bitmap Indexes) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 471.93 Td (A bitmap index stores, for each value of an attribute, a bit vector with one bit per row. Bitmap indexes) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 457.65 Td (are compact for attributes with few distinct values and allow fast combination of conditions with bitwise) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 443.36 Td (AND and OR, which makes them popular in data warehouses.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 7 von 9) Tj ET
+
+endstream
+endobj
+17 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 18 0 R>>
+endobj
+18 0 obj
+<</Length 2789>>
+stream
+0 J
+0 j
+0.57 w
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+0.000 G
+0.000 g
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 18.00 Tf ET
+BT 56.69 779.53 Td (5 Query Processing) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 745.51 Td (5.1 Query Optimization) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 722.83 Td (The query optimizer translates a declarative query into an efficient execution plan. Logical optimization) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 708.55 Td (applies algebraic rules, for example pushing selections down towards the base relations so that) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 694.26 Td (intermediate results stay small. Physical optimization chooses algorithms and access paths for each) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 679.98 Td (operator.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 657.12 Td (A cost model estimates the cost of a plan from statistics such as table sizes, the number of distinct) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 642.83 Td (values and histograms. For joins of many relations, the optimizer searches the space of join orders,) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 628.54 Td (typically with dynamic programming.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 594.35 Td (5.2 Join Algorithms) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 571.67 Td (The nested-loop join compares every tuple of the outer relation with every tuple of the inner relation; the) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 557.38 Td (block nested-loop variant reads the inner relation once per block of the outer one. An index nested-loop) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 543.10 Td (join uses an index on the join attribute of the inner relation.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 520.24 Td (The sort-merge join sorts both inputs on the join attribute and merges them. The hash join builds a hash) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 505.95 Td (table on the smaller input and probes it with the tuples of the larger one; it is usually the fastest) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 491.66 Td (algorithm for equality joins of large unsorted inputs.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 8 von 9) Tj ET
+
+endstream
+endobj
+19 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/Contents 20 0 R>>
+endobj
+20 0 obj
+<</Length 3366>>
+stream
+0 J
+0 j
+0.57 w
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+0.000 G
+0.000 g
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 18.00 Tf ET
+BT 56.69 779.53 Td (6 Distributed Databases) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 745.51 Td (6.1 Fragmentation and Replication) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 722.83 Td (A distributed database stores data at several sites. Horizontal fragmentation splits a relation into) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 708.55 Td (subsets of rows, for example by region; vertical fragmentation splits it into subsets of columns.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 694.26 Td (Replication keeps copies of fragments at several sites to improve availability and read performance, at) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 679.98 Td (the cost of keeping the copies consistent.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 645.78 Td (6.2 Distributed Commit) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 623.10 Td (A transaction that changes data at several sites must commit everywhere or nowhere. The two-phase) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 608.81 Td (commit protocol \(2PC\) achieves this with a coordinator. In the voting phase, the coordinator asks all) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 594.53 Td (participants whether they can commit; each participant writes its changes to its log and answers yes or) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 580.24 Td (no. In the decision phase, the coordinator sends commit if all participants voted yes and abort) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 565.95 Td (otherwise.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 543.10 Td (Two-phase commit blocks if the coordinator fails after the voting phase: participants that voted yes) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 528.81 Td (cannot decide on their own. Three-phase commit and consensus protocols such as Paxos reduce this) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 514.52 Td (problem.) Tj ET
+BT /Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 13.00 Tf ET
+BT 56.69 480.33 Td (6.3 The CAP Theorem) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 457.65 Td (The CAP theorem states that a distributed system cannot guarantee consistency, availability and) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 443.36 Td (partition tolerance at the same time. Since network partitions cannot be ruled out, systems choose) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 429.07 Td (between consistency and availability during a partition; many NoSQL stores choose availability and) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 10.50 Tf ET
+BT 56.69 414.79 Td (offer eventual consistency.) Tj ET
+BT /F0a76705d18e0494dd24cb573e53aa0a8c710ec99 8.00 Tf ET
+BT 56.69 34.02 Td (Database Systems - Lecture Notes · Seite 9 von 9) Tj ET
+
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R ]
+/Count 9
+/MediaBox [0 0 595.28 841.89]
+>>
+endobj
+21 0 obj
+<</Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+>>
+endobj
+22 0 obj
+<</Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F0a76705d18e0494dd24cb573e53aa0a8c710ec99 21 0 R
+/Ff5d2de5f3a71699ae4b2d83179e62d09e6fc4126 22 0 R
+>>
+/XObject <<
+>>
+/ColorSpace <<
+>>
+>>
+endobj
+23 0 obj
+<<
+/Producer (þÿ F P D F   1 . 7)
+/Title (þÿ D a t a b a s e   S y s t e m s   -   L e c t u r e   N o t e s)
+/Creator (þÿ P e r s o n a l R A G   d e m o g e n)
+/CreationDate (D:20260101000000)
+/ModDate (D:20260101000000)
+>>
+endobj
+24 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/Names <<
+/EmbeddedFiles << /Names [
+  
+] >>
+>>
+>>
+endobj
+xref
+0 25
+0000000000 65535 f 
+0000036279 00000 n 
+0000036618 00000 n 
+0000000009 00000 n 
+0000000087 00000 n 
+0000000661 00000 n 
+0000000739 00000 n 
+0000006419 00000 n 
+0000006497 00000 n 
+0000011161 00000 n 
+0000011240 00000 n 
+0000017071 00000 n 
+0000017151 00000 n 
+0000023449 00000 n 
+0000023529 00000 n 
+0000026669 00000 n 
+0000026749 00000 n 
+0000029862 00000 n 
+0000029942 00000 n 
+0000032782 00000 n 
+0000032862 00000 n 
+0000036419 00000 n 
+0000036516 00000 n 
+0000036830 00000 n 
+0000037072 00000 n 
+trailer
+<<
+/Size 25
+/Root 24 0 R
+/Info 23 0 R
+>>
+startxref
+37170
+%%EOF

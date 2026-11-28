@@ -163,3 +163,86 @@ cases:
     - angebot-34-konzepterin.pdf
     - angebot-36-kampagnenmanager.pdf
     - angebot-40-teamassistenz.pdf
+- id: skript-pruefungsfragen
+  folder: skript
+  mode: agent
+  question: Erstelle 5 Prüfungsfragen mit Musterlösungen zu Kapitel 3 des Vorlesungsskripts Database Systems.
+  expect:
+    concepts:
+    - - ACID
+    - - serializab
+      - serialisierbar
+    - - two-phase locking
+      - Zwei-Phasen-Sperr
+      - 2PL
+    - - deadlock
+      - Verklemmung
+    - - wait-for
+      - Wartegraph
+    - - isolation level
+      - Isolationsstufe
+      - Isolationslevel
+    - - write-ahead
+      - WAL
+    - - undo
+      - redo
+    - - conflict graph
+      - precedence graph
+      - Konfliktgraph
+    min_concepts: 4
+    excludes:
+    - B+-
+    - ANSI/SPARC
+    - hash join
+    - Normalform
+    - normal form
+    - two-phase commit
+    - Zwei-Phasen-Commit
+    - 2PC
+    min_questions: 5
+  note: The notes are in English, the task in German. Chapter 3 is about transactions; terms from other chapters (B+-trees, normal forms, two-phase commit) must not appear.
+- id: skript-2pl-seite
+  folder: skript
+  mode: answer
+  question: Auf welcher Seite des Skripts wird das Zwei-Phasen-Sperrprotokoll (Two-Phase Locking) erklärt?
+  expect:
+    documents:
+    - database-systems.pdf
+    concepts:
+    - - Seite 5
+      - S. 5
+      - page 5
+      - Seiten 5
+    min_concepts: 1
+  note: Two-phase commit (chapter 6) is a different protocol.
+- id: pruefung-regeln
+  folder: pruefung
+  mode: agent
+  question: Prüfe die Bachelorarbeit von Jana Meier gegen die Regeln aus der Prüfungsordnung und dem Leitfaden für Abschlussarbeiten. Nenne für jede Regel, ob sie eingehalten ist, mit Begründung.
+  expect:
+    concepts:
+    - - "85"
+    - - Eigenständigkeitserklärung
+      - Selbstständigkeitserklärung
+      - Selbständigkeitserklärung
+      - eidesstattliche Erklärung
+    - - 12 Quellen
+      - 12 Einträge
+      - 12 Literatur
+      - zwölf
+      - nur 12
+      - 12 Titel
+      - 12 Referenzen
+      - 12 Werke
+      - 12 Publikationen
+    min_concepts: 3
+  note: "Three violations: 85 pages instead of at most 60, no declaration of authorship, 12 sources instead of at least 20. Structure, abstracts, citation style, language and figure captions are fine; reporting them as violations is wrong (check by hand)."
+- id: pruefung-umfang
+  folder: pruefung
+  mode: answer
+  question: Wie viele Seiten darf eine Bachelorarbeit höchstens umfassen?
+  expect:
+    documents:
+    - pruefungsordnung-bachelor-informatik.pdf
+    contains:
+    - "60"

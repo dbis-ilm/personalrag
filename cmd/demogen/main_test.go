@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -154,6 +155,60 @@ func TestScanNeedsOCR(t *testing.T) {
 	for _, p := range s.present {
 		if n := personName(p); !strings.Contains(text, n) {
 			t.Errorf("participant %s not recognised", n)
+		}
+	}
+}
+
+// The notes extract with their section headings on the pages the table of
+// contents names, and the page question's expectation matches.
+func TestScriptExtract(t *testing.T) {
+	_, pages := scriptPages()
+	paras, _, err := ingest.Extract(context.Background(), filepath.Join(committed, "skript", scriptFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, num := range []string{"3.1", "3.3", "3.6", "6.2"} {
+		found := false
+		for _, p := range paras {
+			if strings.HasPrefix(p.Text, num+" ") && p.PageNum == pages[num] {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("section %s not on page %d", num, pages[num])
+		}
+	}
+	text := strings.Join(strings.Fields(strings.Join(extract(t, filepath.Join(committed, "skript", scriptFile)), " ")), " ")
+	for _, s := range []string{"two-phase locking protocol (2PL)", "two-phase commit protocol (2PC)", "wait-for graph"} {
+		if !strings.Contains(text, s) {
+			t.Errorf("notes lack %q", s)
+		}
+	}
+}
+
+// The thesis shows its length only through the table of contents and has
+// thesisSources references and no declaration of authorship.
+func TestThesisExtract(t *testing.T) {
+	text := strings.Join(extract(t, filepath.Join(committed, "pruefung", "arbeit", thesisFile)), "\n")
+	if !strings.Contains(text, fmt.Sprintf("Anhang A: Messergebnisse\t%d", thesisBodyPages+1)) {
+		t.Error("table of contents without the appendix page")
+	}
+	refs := 0
+	for _, l := range strings.Split(text[strings.LastIndex(text, "Literaturverzeichnis"):], "\n") {
+		if regexp.MustCompile(`\(\d{4}\):`).MatchString(l) {
+			refs++
+		}
+	}
+	if refs != thesisSources {
+		t.Errorf("%d references, want %d", refs, thesisSources)
+	}
+	if strings.Contains(text, "Erklärung") {
+		t.Error("thesis contains a declaration")
+	}
+	rules := strings.Join(extract(t, filepath.Join(committed, "pruefung", "regeln", regulationsFile)), "\n")
+	for _, s := range []string{"40 bis 60 Seiten", "Eigenständigkeitserklärung"} {
+		if !strings.Contains(rules, s) {
+			t.Errorf("regulations lack %q", s)
 		}
 	}
 }
