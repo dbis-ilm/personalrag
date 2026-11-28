@@ -96,7 +96,7 @@ func Title(q string) string {
 
 func (s *Store) List(ctx context.Context, limit int) ([]Conversation, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, title, collection_id, created_at, updated_at
-		FROM conversations ORDER BY updated_at DESC LIMIT ?`, limit)
+		FROM conversations ORDER BY updated_at DESC, rowid DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
