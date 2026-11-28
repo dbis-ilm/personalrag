@@ -97,6 +97,7 @@ export const de = {
   'tool.read_document': 'Dokument lesen',
   'tool.search_documents': 'Suchen',
   'tool.extract': 'Auswerten',
+  'tool.check': 'Prüfen',
   'tool.calc': 'Rechnen',
   'ask.noHits': 'Keine passenden Stellen gefunden. Versuche andere Begriffe oder eine andere Sammlung.',
   'ask.relevance': 'Relevanz {pct} %',

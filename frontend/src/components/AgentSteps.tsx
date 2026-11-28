@@ -8,6 +8,7 @@ const TOOLS: Record<string, Key> = {
   read_document: 'tool.read_document',
   search_documents: 'tool.search_documents',
   extract: 'tool.extract',
+  check: 'tool.check',
   calc: 'tool.calc',
 }
 

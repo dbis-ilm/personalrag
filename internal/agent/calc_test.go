@@ -225,7 +225,7 @@ func TestCalcLib(t *testing.T) {
 // The tools a script can call are the ones its description names.
 func TestScriptToolNames(t *testing.T) {
 	s := &Server{}
-	if got := strings.Join(s.scriptToolNames(), ","); got != "extract,list_collections,list_documents,read_document,search_documents" {
+	if got := strings.Join(s.scriptToolNames(), ","); got != "check,extract,list_collections,list_documents,read_document,search_documents" {
 		t.Fatalf("names: %s", got)
 	}
 	if got := strings.Join(s.TextLocal().scriptToolNames(), ","); strings.Contains(got, "read_document") {

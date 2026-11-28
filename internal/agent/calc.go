@@ -43,6 +43,7 @@ func (s *Server) scriptTools(ctx context.Context) starlark.StringDict {
 		"list_documents":   builtin(ctx, s, "list_documents", s.listDocuments),
 		"search_documents": builtin(ctx, s, "search_documents", s.searchDocuments),
 		"extract":          builtin(ctx, s, "extract", s.extract),
+		"check":            builtin(ctx, s, "check", s.check),
 	}
 	if !s.noText {
 		d["read_document"] = builtin(ctx, s, "read_document", s.readDocument)
