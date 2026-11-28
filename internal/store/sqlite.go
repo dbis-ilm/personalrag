@@ -207,10 +207,7 @@ var indexSteps = []migrate.Step{
 	// again so their chunks get the new text; cached extract results for
 	// them were computed on the old text. A later change to text extraction
 	// adds a step like this one.
-	{Version: 4, Name: "re-index PDFs: columns kept apart", Up: migrate.Exec(
-		`DELETE FROM extract_cache WHERE document_id IN (SELECT id FROM documents WHERE format = 'PDF')`,
-		`UPDATE documents SET status = 'pending' WHERE format = 'PDF' AND status = 'ok'`,
-	)},
+	{Version: 4, Name: "re-index PDFs: columns kept apart", Up: reindexPDFs},
 	{Version: 5, Name: "collection instructions", Up: func(ctx context.Context, tx *sql.Tx) error {
 		// The app and an MCP process may migrate at the same time.
 		var n int
@@ -223,7 +220,18 @@ var indexSteps = []migrate.Step{
 		}
 		return nil
 	}},
+	// askyourdocs#31, #32: a space between text objects on one line
+	// (letterhead name and date), page-count footers dropped from two-page
+	// documents, page breaks kept after footers of appended slide decks.
+	{Version: 6, Name: "re-index PDFs: spacing and footers", Up: reindexPDFs},
 }
+
+// reindexPDFs queues indexed PDFs again and drops their cached extract
+// results, for a change in PDF text extraction.
+var reindexPDFs = migrate.Exec(
+	`DELETE FROM extract_cache WHERE document_id IN (SELECT id FROM documents WHERE format = 'PDF')`,
+	`UPDATE documents SET status = 'pending' WHERE format = 'PDF' AND status = 'ok'`,
+)
 
 func (s *Store) migrate(path string) error {
 	return migrate.Apply(context.Background(), s.db, "index", indexSteps, migrate.Options{BackupPath: path + ".bak"})
