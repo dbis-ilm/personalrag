@@ -36,6 +36,18 @@ cases:
       Thomas Engel: 7
       Tim Köhler: 3
       Uwe Brenner: 10
+    not_counted:
+    - Claudia Reuter
+    - Eva Kirchner
+    - Georg Wiese
+    - Henrik Lorenz
+    - Lisa Hoffmann
+    - Marion Busch
+    - Michael Bauer
+    - Nina Albrecht
+    - Paul Ritter
+    - Renate Kühn
+    - Simon Krause
   note: Participants stand in the left column, guests and the excused in the right one. Protocol 47 is a scan (OCR). The deputy counts for himself, not for the member he stands in for.
 - id: protokolle-bibliotheksordnung
   folder: protokolle

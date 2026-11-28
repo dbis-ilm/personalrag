@@ -46,7 +46,8 @@ type Expect struct {
 	Documents   []string      `yaml:"documents,omitempty"`   // all must be among the hits or cited sources
 	Distractors []string      `yaml:"distractors,omitempty"` // should not be returned (reported, not required)
 	Contains    []string      `yaml:"contains,omitempty"`
-	Counts      yaml.MapSlice `yaml:"counts,omitempty"` // person → sessions attended; nobody else may be counted
+	Counts      yaml.MapSlice `yaml:"counts,omitempty"`      // person → sessions attended
+	NotCounted  []string      `yaml:"not_counted,omitempty"` // people who must not be counted (guests)
 }
 
 // Cases is the file format of demo/cases.yaml.
@@ -101,6 +102,15 @@ func buildCases(ss []session, offers []offer) Cases {
 			}
 		}
 	}
+	var guests []string
+	for _, s := range ss {
+		for _, g := range s.printedGuests() {
+			if n := personName(g); !slices.Contains(guests, n) {
+				guests = append(guests, n)
+			}
+		}
+	}
+	slices.Sort(guests)
 	hits, lookalike := equipmentFiles(offers)
 	file := func(n int) string { return fmt.Sprintf("protokoll-%d.pdf", n) }
 
@@ -108,7 +118,7 @@ func buildCases(ss []session, offers []offer) Cases {
 		{
 			ID: "protokolle-teilnahme", Folder: "protokolle", Mode: "agent",
 			Question: "Erstelle mir aus allen Protokollen der Sammlung eine Liste der Teilnehmerinnen und Teilnehmer (nur die Anwesenden, keine Gäste und keine Entschuldigten) und zähle, an wie vielen Sitzungen jede Person teilgenommen hat.",
-			Expect:   Expect{Counts: cm},
+			Expect:   Expect{Counts: cm, NotCounted: guests},
 			Note:     fmt.Sprintf("Participants stand in the left column, guests and the excused in the right one. Protocol %d is a scan (OCR). The deputy counts for himself, not for the member he stands in for.", scanSession),
 		},
 		{
