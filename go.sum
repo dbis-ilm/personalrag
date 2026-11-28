@@ -15,8 +15,8 @@ github.com/coder/websocket v1.8.14/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6p
 github.com/danieljoos/wincred v1.2.3 h1:v7dZC2x32Ut3nEfRH+vhoZGvN72+dQ/snVXo/vMFLdQ=
 github.com/danieljoos/wincred v1.2.3/go.mod h1:6qqX0WNrS4RzPZ1tnroDzq9kY3fu1KwE7MRLQK4X0bs=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dbis-ilm/askyourdocs v0.0.0-20261127214852-c4e8f9274e55 h1:nB2GXE1Ka6w6atpEjXjBej60GsJejZAxVWKV6wNok9M=
-github.com/dbis-ilm/askyourdocs v0.0.0-20261127214852-c4e8f9274e55/go.mod h1:JGOR7EJlDDCdmmaVmDvIfVzjaTbhcS8Wrhqvv0xYgaI=
+github.com/dbis-ilm/askyourdocs v0.0.0-20261128103819-bdcb14918a82 h1:5mFyduNfSbz+iP6up5OutxggmzLxKNdEt0FN6TSy24Y=
+github.com/dbis-ilm/askyourdocs v0.0.0-20261128103819-bdcb14918a82/go.mod h1:JGOR7EJlDDCdmmaVmDvIfVzjaTbhcS8Wrhqvv0xYgaI=
 github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2xWg=
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/ebitengine/purego v0.11.1 h1:2zpWRSQNVKN4eKsKO9eM1ILDgWfYMY9GwqRmK6XeQ/0=

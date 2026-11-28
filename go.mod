@@ -3,7 +3,7 @@ module github.com/dbis-ilm/personalrag
 go 1.26.0
 
 require (
-	github.com/dbis-ilm/askyourdocs v0.0.0-20261127214852-c4e8f9274e55
+	github.com/dbis-ilm/askyourdocs v0.0.0-20261128103819-bdcb14918a82
 	github.com/firebase/genkit/go v1.14.0
 	github.com/fsnotify/fsevents v0.2.0
 	github.com/fsnotify/fsnotify v1.9.0
