@@ -64,6 +64,7 @@ type Server struct {
 	eng     *rag.Engine
 	version string
 	all     bool // in-app agent: every collection, not only shared ones
+	noText  bool // no document text in results: no read_document, search without passage text
 }
 
 func New(st *store.Store, eng *rag.Engine, version string) *Server {
@@ -509,8 +510,11 @@ func (s *Server) searchDocuments(ctx context.Context, in SearchIn) (SearchOut, o
 		if sec := firstNonEmpty(h.Section, h.Breadcrumb); sec != "" {
 			loc = append(loc, sec)
 		}
-		text := askyourdocs.SanitizeUntrusted(h.Text)
-		warn = append(warn, askyourdocs.DetectInjection(text)...)
+		text := ""
+		if !s.noText {
+			text = askyourdocs.SanitizeUntrusted(h.Text)
+			warn = append(warn, askyourdocs.DetectInjection(text)...)
+		}
 		out.Passages = append(out.Passages, PassageOut{
 			DocumentID: h.DocumentID, Name: filepath.Base(h.Path), Path: relPath(colls[h.CollectionID], h.Path), Collection: h.CollectionID,
 			Location: strings.Join(loc, " · "), Score: h.Score, Text: text,

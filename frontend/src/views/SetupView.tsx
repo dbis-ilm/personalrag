@@ -115,6 +115,21 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
               <ModelOptions key={p.id} provider={p} models={(p.models ?? []).filter((m) => !m.embedding)} needTools />
             ))}
           </select>
+          <label className="check">
+            <input
+              type="checkbox" checked={!!rt?.agentTextLocal} disabled={!llm.startsWith('ollama/')}
+              onChange={(e) => {
+                const on = e.target.checked
+                AppService.SaveAgentTextLocal(on)
+                  .then(() => { setRt((r) => (r ? { ...r, agentTextLocal: on } : r)); toast(t('setup.saved'), 'ok') })
+                  .catch((err) => toast(errorText(err), 'error'))
+              }}
+            />
+            {t('setup.agentTextLocal')}
+          </label>
+          <span className="muted" style={{ fontSize: 12 }}>
+            {llm.startsWith('ollama/') ? t('setup.agentTextLocalHint') : t('setup.agentTextLocalNeedsLocal', { model: llm.replace(/^[a-z]+\//, '') || t('setup.noLlmShort') })}
+          </span>
           <span className="muted" style={{ fontSize: 12 }}>
             {t('setup.agentHint')}
             {rt?.suggestedAgent && agentSpec !== rt.suggestedAgent && <> {t('setup.agentSuggested', { model: rt.suggestedAgent.replace(/^[a-z]+\//, '') })}</>}

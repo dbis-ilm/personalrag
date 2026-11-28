@@ -118,8 +118,11 @@ func TestAgentMode(t *testing.T) {
 	}
 
 	// A follow-up in the same conversation carries the earlier turn.
-	if p := agentPrompt("Und als Tabelle?", "p", "Protokolle", []history.Turn{turn}); !strings.Contains(p, "Die Sammlung enthält 3 Dokumente.") || !strings.Contains(p, `"p"`) {
+	if p := agentPrompt("Und als Tabelle?", "p", "Protokolle", []history.Turn{turn}, false); !strings.Contains(p, "Die Sammlung enthält 3 Dokumente.") || !strings.Contains(p, `"p"`) {
 		t.Fatalf("prompt: %s", p)
+	}
+	if p := agentPrompt("x", "", "", nil, true); !strings.Contains(p, "no read_document") {
+		t.Fatalf("text-local prompt: %s", p)
 	}
 
 	// Stopping a running task.

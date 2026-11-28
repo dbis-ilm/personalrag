@@ -19,7 +19,7 @@ const mod = () => (isMac ? '⌘' : t('common.ctrl'))
 const narrow = () => window.matchMedia('(max-width: 1180px)').matches
 
 export default function AskView({
-  conversationId, onConversation, onChanged, scopeId, scopeName, searchOnly, agentModel, agentRemote, answerLocal, hasCollections, onAddFolder, onClearScope,
+  conversationId, onConversation, onChanged, scopeId, scopeName, searchOnly, agentModel, agentRemote, agentTextLocal, answerLocal, hasCollections, onAddFolder, onClearScope,
 }: {
   conversationId: string
   onConversation: (id: string, collectionId: string) => void
@@ -30,6 +30,7 @@ export default function AskView({
   agentModel: string // "" = no agent mode
   agentRemote: string // host the agent model runs on, "" = this machine
   answerLocal: boolean // the answer model (which reads text for "extract") runs here
+  agentTextLocal: boolean // the agent gets no document text, only extract results
   hasCollections: boolean
   onAddFolder: () => void
   onClearScope: () => void
@@ -429,7 +430,9 @@ export default function AskView({
         </div>
 
         {mode === 'agent' && agentRemote && (
-          <div className="inline-note agent-remote"><Icon name="alert" size={13} strokeWidth={2.2} />{t('agent.remote', { host: agentRemote })}{answerLocal && ` ${t('agent.remoteLocalExtract')}`}</div>
+          <div className="inline-note agent-remote"><Icon name="alert" size={13} strokeWidth={2.2} />{agentTextLocal && answerLocal
+            ? t('agent.remoteTextLocal', { host: agentRemote })
+            : <>{t('agent.remote', { host: agentRemote })}{answerLocal && ` ${t('agent.remoteLocalExtract')}`}</>}</div>
         )}
         <form className="composer" onSubmit={(e) => { e.preventDefault(); run(draft) }}>
           <div className="composer-box">

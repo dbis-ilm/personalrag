@@ -334,6 +334,12 @@ func TestAgentModel(t *testing.T) {
 	if err := s.SaveAgentModel("", false); err != nil {
 		t.Fatal(err)
 	}
+	if err := s.SaveAgentTextLocal(true); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, _ := config.Load(s.dataDir); !cfg.AgentTextLocal || !s.RuntimeInfo().AgentTextLocal {
+		t.Fatal("agent text-local not saved")
+	}
 	if err := s.SaveAgentModel("foo/bar", false); err == nil {
 		t.Fatal("unknown provider accepted")
 	}

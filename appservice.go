@@ -70,11 +70,13 @@ type AppStatus struct {
 	// AgentRemote is the host the agent model runs on when that is another
 	// machine: tasks, document lists and excerpts go there.
 	AgentRemote string `json:"agentRemote"`
-	LLM         string `json:"llm"`
-	Embedding   string `json:"embedding"`
-	Error       string `json:"error"`
-	DataDir     string `json:"dataDir"`
-	LastCrash   string `json:"lastCrash"` // when the previous run crashed (RFC 3339); "" if it did not
+	// AgentTextLocal: the agent gets no document text, only extract results.
+	AgentTextLocal bool   `json:"agentTextLocal"`
+	LLM            string `json:"llm"`
+	Embedding      string `json:"embedding"`
+	Error          string `json:"error"`
+	DataDir        string `json:"dataDir"`
+	LastCrash      string `json:"lastCrash"` // when the previous run crashed (RFC 3339); "" if it did not
 	// Language is the language in use ("de" | "en"); LanguageSetting what
 	// the user chose ("" = follow the system).
 	Language        string `json:"language"`
@@ -290,11 +292,12 @@ type cachedSearch struct {
 // agentRuntime is what the agent mode needs: its model and the tools,
 // registered on the core's Genkit.
 type agentRuntime struct {
-	spec   string
-	g      *genkit.Genkit
-	model  ai.Model
-	config any
-	tools  []ai.ToolRef
+	spec      string
+	textLocal bool // no document text in tool results
+	g         *genkit.Genkit
+	model     ai.Model
+	config    any
+	tools     []ai.ToolRef
 }
 
 type core struct {
@@ -398,6 +401,7 @@ func (s *AppService) restartCore() {
 		status.Ready = true
 		if c.agent != nil {
 			status.Agent = modelName(c.agent.spec)
+			status.AgentTextLocal = c.agent.textLocal
 			if providerOf(c.agent.spec) == providerGPUStack && !askyourdocs.IsLocalURL(cfg.GPUStackURL) {
 				status.AgentRemote = askyourdocs.URLHost(cfg.GPUStackURL)
 			}
@@ -503,10 +507,14 @@ func (s *AppService) buildCore(cfg config.Settings) (*core, error) {
 		if m, err := providers.Model(g, spec); err != nil {
 			slog.Warn("agent model unavailable", "model", spec, "err", err)
 		} else {
+			srv := agent.New(c.st, c.eng, version).InApp()
+			if cfg.AgentTextLocal {
+				srv = srv.TextLocal()
+			}
 			c.agent = &agentRuntime{
-				spec: spec, g: g, model: m,
+				spec: spec, textLocal: cfg.AgentTextLocal, g: g, model: m,
 				config: askyourdocs.GenerateConfig(spec, askyourdocs.GenerateOptions{NumCtx: 32768, KeepAlive: "30m"}),
-				tools:  agent.New(c.st, c.eng, version).InApp().Tools(g),
+				tools:  srv.Tools(g),
 			}
 		}
 	}
