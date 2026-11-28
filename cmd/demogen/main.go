@@ -48,6 +48,12 @@ type Expect struct {
 	Contains    []string      `yaml:"contains,omitempty"`
 	Counts      yaml.MapSlice `yaml:"counts,omitempty"`      // person → sessions attended
 	NotCounted  []string      `yaml:"not_counted,omitempty"` // people who must not be counted (guests)
+	// Concepts are groups of alternative terms (any language); at least
+	// MinConcepts groups must occur in the answer.
+	Concepts     [][]string `yaml:"concepts,omitempty"`
+	MinConcepts  int        `yaml:"min_concepts,omitempty"`
+	Excludes     []string   `yaml:"excludes,omitempty"`      // terms the answer must not contain
+	MinQuestions int        `yaml:"min_questions,omitempty"` // question marks the answer must contain
 }
 
 // Cases is the file format of demo/cases.yaml.
@@ -59,7 +65,7 @@ type Cases struct {
 func generate(out string) error {
 	ss := buildSessions()
 	offers := buildOffers()
-	for _, d := range []string{"protokolle", "angebote"} {
+	for _, d := range []string{"protokolle", "angebote", "skript", "pruefung"} {
 		dir := filepath.Join(out, d)
 		if err := os.RemoveAll(dir); err != nil {
 			return err
@@ -72,6 +78,12 @@ func generate(out string) error {
 		return err
 	}
 	if err := writeOffers(filepath.Join(out, "angebote"), offers); err != nil {
+		return err
+	}
+	if err := writeScript(filepath.Join(out, "skript")); err != nil {
+		return err
+	}
+	if err := writeRules(filepath.Join(out, "pruefung")); err != nil {
 		return err
 	}
 	data, err := yaml.Marshal(buildCases(ss, offers))
@@ -154,6 +166,48 @@ func buildCases(ss []session, offers []offer) Cases {
 			ID: "angebote-dienstwagen-suche", Folder: "angebote", Mode: "search",
 			Question: "Dienstwagen",
 			Expect:   Expect{Documents: hits, Distractors: lookalike},
+		},
+		{
+			ID: "skript-pruefungsfragen", Folder: "skript", Mode: "agent",
+			Question: "Erstelle 5 Prüfungsfragen mit Musterlösungen zu Kapitel 3 des Vorlesungsskripts Database Systems.",
+			Expect: Expect{
+				Concepts: [][]string{
+					{"ACID"}, {"serializab", "serialisierbar"}, {"two-phase locking", "Zwei-Phasen-Sperr", "2PL"},
+					{"deadlock", "Verklemmung"}, {"wait-for", "Wartegraph"}, {"isolation level", "Isolationsstufe", "Isolationslevel"},
+					{"write-ahead", "WAL"}, {"undo", "redo"}, {"conflict graph", "precedence graph", "Konfliktgraph"},
+				},
+				MinConcepts:  4,
+				Excludes:     []string{"B+-", "ANSI/SPARC", "hash join", "Normalform", "normal form", "two-phase commit", "Zwei-Phasen-Commit", "2PC"},
+				MinQuestions: 5,
+			},
+			Note: "The notes are in English, the task in German. Chapter 3 is about transactions; terms from other chapters (B+-trees, normal forms, two-phase commit) must not appear.",
+		},
+		{
+			ID: "skript-2pl-seite", Folder: "skript", Mode: "answer",
+			Question: "Auf welcher Seite des Skripts wird das Zwei-Phasen-Sperrprotokoll (Two-Phase Locking) erklärt?",
+			Expect: Expect{Documents: []string{scriptFile}, MinConcepts: 1, Concepts: [][]string{func() []string {
+				p := scriptSectionPage("3.3")
+				return []string{fmt.Sprintf("Seite %d", p), fmt.Sprintf("S. %d", p), fmt.Sprintf("page %d", p), fmt.Sprintf("Seiten %d", p)}
+			}()}},
+			Note: "Two-phase commit (chapter 6) is a different protocol.",
+		},
+		{
+			ID: "pruefung-regeln", Folder: "pruefung", Mode: "agent",
+			Question: "Prüfe die Bachelorarbeit von Jana Meier gegen die Regeln aus der Prüfungsordnung und dem Leitfaden für Abschlussarbeiten. Nenne für jede Regel, ob sie eingehalten ist, mit Begründung.",
+			Expect: Expect{
+				Concepts: [][]string{
+					{fmt.Sprint(thesisBodyPages)},
+					{"Eigenständigkeitserklärung", "Selbstständigkeitserklärung", "Selbständigkeitserklärung", "eidesstattliche Erklärung"},
+					{fmt.Sprintf("%d Quellen", thesisSources), fmt.Sprintf("%d Einträge", thesisSources), fmt.Sprintf("%d Literatur", thesisSources), "zwölf", fmt.Sprintf("nur %d", thesisSources), fmt.Sprintf("%d Titel", thesisSources), fmt.Sprintf("%d Referenzen", thesisSources), fmt.Sprintf("%d Werke", thesisSources), fmt.Sprintf("%d Publikationen", thesisSources)},
+				},
+				MinConcepts: 3,
+			},
+			Note: fmt.Sprintf("Three violations: %d pages instead of at most 60, no declaration of authorship, %d sources instead of at least 20. Structure, abstracts, citation style, language and figure captions are fine; reporting them as violations is wrong (check by hand).", thesisBodyPages, thesisSources),
+		},
+		{
+			ID: "pruefung-umfang", Folder: "pruefung", Mode: "answer",
+			Question: "Wie viele Seiten darf eine Bachelorarbeit höchstens umfassen?",
+			Expect:   Expect{Documents: []string{regulationsFile}, Contains: []string{"60"}},
 		},
 	}}
 }

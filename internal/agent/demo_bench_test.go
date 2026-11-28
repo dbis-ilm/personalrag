@@ -49,11 +49,15 @@ type demoCase struct {
 	Mode     string `yaml:"mode"`
 	Question string `yaml:"question"`
 	Expect   struct {
-		Documents   []string       `yaml:"documents"`
-		Distractors []string       `yaml:"distractors"`
-		Contains    []string       `yaml:"contains"`
-		Counts      map[string]int `yaml:"counts"`
-		NotCounted  []string       `yaml:"not_counted"`
+		Documents    []string       `yaml:"documents"`
+		Distractors  []string       `yaml:"distractors"`
+		Contains     []string       `yaml:"contains"`
+		Counts       map[string]int `yaml:"counts"`
+		NotCounted   []string       `yaml:"not_counted"`
+		Concepts     [][]string     `yaml:"concepts"`
+		MinConcepts  int            `yaml:"min_concepts"`
+		Excludes     []string       `yaml:"excludes"`
+		MinQuestions int            `yaml:"min_questions"`
 	} `yaml:"expect"`
 }
 
@@ -86,13 +90,23 @@ func TestDemoCasesParse(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(demoDir, c.Folder)); err != nil {
 			t.Errorf("%s: folder %s: %v", c.ID, c.Folder, err)
 		}
+		files := map[string]bool{}
+		filepath.WalkDir(filepath.Join(demoDir, c.Folder), func(p string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				files[d.Name()] = true
+			}
+			return nil
+		})
 		for _, d := range append(slices.Clone(c.Expect.Documents), c.Expect.Distractors...) {
-			if _, err := os.Stat(filepath.Join(demoDir, c.Folder, d)); err != nil {
-				t.Errorf("%s: %v", c.ID, err)
+			if !files[d] {
+				t.Errorf("%s: no %s in %s", c.ID, d, c.Folder)
 			}
 		}
-		if c.Mode == "agent" && len(c.Expect.Counts) == 0 {
-			t.Errorf("%s: agent case without counts", c.ID)
+		if c.Mode == "agent" && len(c.Expect.Counts) == 0 && len(c.Expect.Concepts) == 0 {
+			t.Errorf("%s: agent case without counts or concepts", c.ID)
+		}
+		if c.Expect.MinConcepts > len(c.Expect.Concepts) {
+			t.Errorf("%s: min_concepts %d of %d", c.ID, c.Expect.MinConcepts, len(c.Expect.Concepts))
 		}
 	}
 }
@@ -133,6 +147,47 @@ func checkDocuments(c demoCase, found []string, o *benchResult, what string) {
 	}
 	if len(wrong) > 0 {
 		o.note("Ablenker: %s", strings.Join(wrong, ", "))
+	}
+}
+
+// checkConcepts counts the concept groups that occur in the answer and
+// checks excluded terms and the number of questions.
+func checkConcepts(c demoCase, answer string, o *benchResult) {
+	low := strings.ToLower(answer)
+	if n := len(c.Expect.Concepts); n > 0 {
+		hit := 0
+		var missing []string
+		for _, group := range c.Expect.Concepts {
+			found := false
+			for _, term := range group {
+				if strings.Contains(low, strings.ToLower(term)) {
+					found = true
+					break
+				}
+			}
+			if found {
+				hit++
+			} else {
+				missing = append(missing, group[0])
+			}
+		}
+		if hit < c.Expect.MinConcepts {
+			o.fail("%d/%d Begriffe (mindestens %d); fehlt %s", hit, n, c.Expect.MinConcepts, strings.Join(missing, ", "))
+		} else {
+			o.note("%d/%d Begriffe", hit, n)
+		}
+	}
+	var excluded []string
+	for _, term := range c.Expect.Excludes {
+		if strings.Contains(low, strings.ToLower(term)) {
+			excluded = append(excluded, term)
+		}
+	}
+	if len(excluded) > 0 {
+		o.fail("fremde Begriffe: %s", strings.Join(excluded, ", "))
+	}
+	if q := strings.Count(answer, "?"); q < c.Expect.MinQuestions {
+		o.fail("%d Fragen statt mindestens %d", q, c.Expect.MinQuestions)
 	}
 }
 
@@ -369,6 +424,7 @@ func TestDemoBench(t *testing.T) {
 			o.details = append(o.details, firstPage.details...)
 			checkDocuments(c, cited(text.String(), res.Results), &o, fmt.Sprintf("zitiert nach %d Seiten", pages))
 			checkContains(c, text.String(), &o)
+			checkConcepts(c, text.String(), &o)
 			row(c, answerSpec, o, time.Since(began))
 			t.Logf("answer %s:\n%s", c.ID, text.String())
 
@@ -409,8 +465,11 @@ func TestDemoBench(t *testing.T) {
 				if err != nil {
 					o.fail("Fehler: %v", err)
 				} else {
-					checkCounts(c, answer, &o)
+					if len(c.Expect.Counts) > 0 {
+						checkCounts(c, answer, &o)
+					}
 					checkContains(c, answer, &o)
+					checkConcepts(c, answer, &o)
 				}
 				calcs := 0
 				for _, s := range steps {

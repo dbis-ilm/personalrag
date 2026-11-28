@@ -8,6 +8,8 @@ against `cases.yaml`. All names, institutions and figures are made up.
 |---|---|---|
 | `protokolle/` | Minutes of a university senate, 12 sessions | Participants in a left column next to guests and the excused; headings drawn as one text object padded with spaces (even sessions); a deputy; names in the running text; protocol 47 only as a scan (needs OCR) |
 | `angebote/` | 40 offer letters for professorships | Completeness: 9 mention large-scale equipment (Großgeräte), one only on page 2; others mention look-alikes |
+| `skript/` | Lecture notes "Database Systems" in English, 6 chapters | Exam questions on chapter 3 (transactions) asked in German; a page question; two-phase locking (chapter 3) vs. two-phase commit (chapter 6) |
+| `pruefung/` | Examination regulations and a writing guide (PDF), a bachelor's thesis (Word) | Check the thesis against the rules: 85 instead of at most 60 pages (visible only in its table of contents), no declaration of authorship, 12 instead of at least 20 sources; the other rules are met |
 
 `cases.yaml` lists the questions (search, answer or agent) and the correct
 results: exact attendance counts, the documents a hit list or answer must
