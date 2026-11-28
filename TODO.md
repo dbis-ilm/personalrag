@@ -18,6 +18,16 @@ prompt that forbids inventing anything. Two kinds of task are not covered well; 
 - [ ] Store agent steps with the turn, so they survive a restart.
 - [ ] Make the agent count with `calc` reliably (it still counts in its head sometimes).
 
+### Starlark (`calc`)
+
+`calc` is the only place Starlark runs today (`internal/agent/loop.go`): sandboxed, step limit, no files or network, data through `outputs`. The model still triggers every `extract` as its own turn, so a task over 40 documents is 40+ turns (limit: `agentMaxTurns` = 60) and weak models stop halfway or count in their head.
+
+- [ ] **Tools as Starlark builtins.** Expose `list_documents`, `search_documents`, `extract` and `read_document` in `calc`'s `predeclared`, so one script does `for d in list_documents(...): extract(d, ...)`, counts and returns the table: one tool call instead of 40+. Call the same Go functions as the tools, so sharing checks, "document text stays on this computer" and the access log stay as they are. Every builtin call still emits `agent:step`; a failing document becomes an error value, the script goes on. `extract` is slow and the step limit does not count wall time: cancellation through the context must keep working (Stop button). Change `agentSystem` to "for all documents: one `calc` script with an `extract` loop". Run the benchmark before and after with qwen3.6:27b and gemma4:12b.
+- [ ] **State across `calc` calls.** Each call starts empty. A per-run `state` dict (like the notebook) keeps intermediate results and helper functions, so the model does not retype data; also helps counting reliably.
+- [ ] **More standard library.** Only `json` today. Add `math` and `time` (deadlines, notice periods), and small Go helpers: `normalize_name`, `count_by`, `table()` (Markdown / CSV).
+- [ ] **Files from scripts.** A script builds CSV or `.ics` and the app hands the file to the UI; covers "Reuse results" under Everyday use.
+- [ ] **`check` as hybrid.** The model extracts rules and facts, Starlark evaluates them deterministically (counts, limits, dates): fewer wrong "violated" verdicts than a model-only judgement.
+
 ## Everyday use
 
 What would make the app useful day to day, in order of benefit.
