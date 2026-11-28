@@ -1,0 +1,175 @@
+name: Release
+
+# A tag vX.Y.Z builds PersonalRAG for macOS, Windows and Linux and creates a
+# draft GitHub release with the packages; publish it by hand after a look.
+# Pull requests that touch packaging only build, so the workflow is tested
+# before a tag needs it.
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - build/**
+      - Taskfile.yml
+
+permissions:
+  contents: read
+
+env:
+  WAILS_VERSION: v3.1.0
+  # nfpm (Linux packages) names a maintainer from these.
+  GIT_COMMITTER_NAME: PersonalRAG
+  GIT_COMMITTER_EMAIL: noreply@github.com
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macos, os: macos-latest }
+          - { name: windows, os: windows-latest }
+          - { name: linux, os: ubuntu-24.04 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            v="${GITHUB_REF_NAME#v}"
+          else
+            v="0.0.0-pr.${{ github.event.number }}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          build/set-version.sh "$v"
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libfuse2t64 file
+
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        run: choco install nsis -y --no-progress
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}
+
+      - name: Frontend
+        run: |
+          (cd frontend && npm ci)
+          wails3 generate bindings -ts
+          (cd frontend && npm run build)
+
+      - name: Package (macOS, universal)
+        if: runner.os == 'macOS'
+        run: |
+          wails3 task darwin:package:universal
+          wails3 task darwin:create:dmg
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: wails3 task windows:package
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wails3 task linux:build
+          wails3 task linux:create:deb
+
+      # AppImage tooling is fragile on CI runners; the .deb and the tarball
+      # do not depend on it.
+      - name: AppImage (Linux)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: wails3 task linux:create:appimage
+
+      - name: Collect
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist
+          shopt -s nullglob globstar
+          case "$RUNNER_OS" in
+            macOS)
+              ditto -c -k --keepParent bin/PersonalRAG.app "dist/PersonalRAG-$V-macos-universal.zip"
+              for f in bin/*.dmg; do cp "$f" "dist/PersonalRAG-$V-macos-universal.dmg"; done
+              ;;
+            Windows)
+              for f in bin/*installer*.exe; do cp "$f" "dist/PersonalRAG-$V-windows-amd64-setup.exe"; done
+              7z a -tzip "dist/PersonalRAG-$V-windows-amd64.zip" ./bin/PersonalRAG.exe > /dev/null
+              ;;
+            Linux)
+              tar -C bin -czf "dist/PersonalRAG-$V-linux-amd64.tar.gz" PersonalRAG
+              for f in bin/*.deb; do cp "$f" "dist/PersonalRAG-$V-linux-amd64.deb"; done
+              for f in bin/**/*.AppImage build/linux/appimage/**/*.AppImage; do cp "$f" "dist/PersonalRAG-$V-linux-x86_64.AppImage"; break; done
+              ;;
+          esac
+          ls -la dist
+          test -n "$(ls dist)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: personalrag-${{ matrix.name }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Installation
+
+          The packages are **not signed** yet, so the systems warn on first start:
+
+          - **macOS** (Apple silicon and Intel, macOS 13 or later): open the `.dmg` and drag PersonalRAG to Applications. On first start, right-click the app and choose *Open*, then confirm. Alternatively: `xattr -dr com.apple.quarantine /Applications/PersonalRAG.app`.
+          - **Windows** (64 bit): run the `-setup.exe`. If SmartScreen appears, choose *More info* → *Run anyway*. The `.zip` contains the program without installer.
+          - **Linux** (x86_64, GTK 4 and WebKitGTK 6.0): install the `.deb`, or unpack the `.tar.gz`, or use the AppImage if present.
+
+          PersonalRAG needs a model service: Ollama on this or another computer, or an OpenAI-compatible server such as GPUStack. The setup assistant explains the options; demo collections let you try it without your own documents.
+
+          `SHA256SUMS.txt` lists the checksums of all files.
+          NOTES
+          sed -i 's/^          //' notes.md
+          flags=(--draft --title "PersonalRAG ${TAG#v}" --notes-file notes.md --generate-notes)
+          [[ "$TAG" == *-* ]] && flags+=(--prerelease)
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" dist/*
