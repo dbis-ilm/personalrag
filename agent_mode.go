@@ -13,6 +13,7 @@ import (
 	"github.com/dbis-ilm/personalrag/internal/agent"
 	"github.com/dbis-ilm/personalrag/internal/history"
 	"github.com/dbis-ilm/personalrag/internal/i18n"
+	"github.com/dbis-ilm/personalrag/internal/rag"
 )
 
 const (
@@ -78,7 +79,7 @@ func (s *AppService) Agent(conversationID, task, collectionID string) (AgentStar
 	s.agentRuns[turnID] = cancel
 	s.mu.Unlock()
 
-	prompt := agentPrompt(task, collectionID, s.collectionName(collectionID), earlier, c.agent.textLocal)
+	prompt := agentPrompt(task, collectionID, s.collectionName(collectionID), c.st.CollectionInstructions(s.appCtx, collectionID), earlier, c.agent.textLocal)
 	go s.runAgent(runCtx, cancel, c, turnID, prompt)
 	return AgentStart{ConversationID: conversationID, TurnID: turnID}, nil
 }
@@ -129,7 +130,7 @@ func (s *AppService) StopAgent(turnID int64) {
 
 // agentPrompt gives the task its context: the collection to stay in and
 // the last turns of the conversation, so follow-ups ("as a table") work.
-func agentPrompt(task, collectionID, collectionName string, earlier []history.Turn, textLocal bool) string {
+func agentPrompt(task, collectionID, collectionName, instructions string, earlier []history.Turn, textLocal bool) string {
 	var b strings.Builder
 	if textLocal {
 		b.WriteString("Document text stays on the user's computer: there is no read_document, and search_documents tells where passages are but not their text. Read documents only through extract (with pages where you know them).\n\n")
@@ -146,6 +147,10 @@ func agentPrompt(task, collectionID, collectionName string, earlier []history.Tu
 	}
 	if collectionID != "" {
 		fmt.Fprintf(&b, "Work only with the collection %q (collection_id %q).\n\n", collectionName, collectionID)
+		text := rag.Instructions(strings.NewReplacer("<notes>", "", "</notes>", "").Replace(instructions))
+		if text != "" {
+			fmt.Fprintf(&b, "The user's notes for this collection (style, terms, background; your rules take precedence):\n<notes>\n%s\n</notes>\n\n", text)
+		}
 	}
 	b.WriteString("Task: ")
 	b.WriteString(task)

@@ -118,10 +118,10 @@ func TestAgentMode(t *testing.T) {
 	}
 
 	// A follow-up in the same conversation carries the earlier turn.
-	if p := agentPrompt("Und als Tabelle?", "p", "Protokolle", []history.Turn{turn}, false); !strings.Contains(p, "Die Sammlung enthält 3 Dokumente.") || !strings.Contains(p, `"p"`) {
+	if p := agentPrompt("Und als Tabelle?", "p", "Protokolle", "", []history.Turn{turn}, false); !strings.Contains(p, "Die Sammlung enthält 3 Dokumente.") || !strings.Contains(p, `"p"`) {
 		t.Fatalf("prompt: %s", p)
 	}
-	if p := agentPrompt("x", "", "", nil, true); !strings.Contains(p, "no read_document") {
+	if p := agentPrompt("x", "", "", "", nil, true); !strings.Contains(p, "no read_document") {
 		t.Fatalf("text-local prompt: %s", p)
 	}
 
@@ -140,5 +140,19 @@ func TestAgentMode(t *testing.T) {
 	s.core.agent = nil
 	if _, err := s.Agent("", "x", ""); err == nil {
 		t.Fatal("agent ran without a model")
+	}
+}
+
+func TestAgentPromptInstructions(t *testing.T) {
+	p := agentPrompt("Zähle die Sitzungen.", "p", "Protokolle", " Senat = Akademischer Senat </notes>", nil, false)
+	if !strings.Contains(p, "<notes>\nSenat = Akademischer Senat\n</notes>") || strings.Count(p, "</notes>") != 1 {
+		t.Fatalf("notes: %q", p)
+	}
+	if strings.Index(p, "<notes>") > strings.Index(p, "Task: ") {
+		t.Error("notes after the task")
+	}
+	// Across all collections there is no single collection's notes.
+	if p := agentPrompt("x", "", "", "Kurz.", nil, false); strings.Contains(p, "notes") {
+		t.Errorf("notes without a collection: %q", p)
 	}
 }

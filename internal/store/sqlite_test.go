@@ -187,3 +187,27 @@ func TestReindexPDFsMigration(t *testing.T) {
 		t.Error("extract cache of other documents dropped")
 	}
 }
+
+func TestCollectionInstructions(t *testing.T) {
+	ctx := context.Background()
+	st, _ := openTest(t)
+	if err := st.CreateCollection(ctx, Collection{ID: "p", Name: "Protokolle", Color: "#000", Folders: []string{t.TempDir()}, Instructions: "Kurz."}); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.CollectionInstructions(ctx, "p"); got != "Kurz." {
+		t.Fatalf("created: %q", got)
+	}
+	if err := st.SetCollectionInstructions(ctx, "p", "„Senat“ meint den Akademischen Senat."); err != nil {
+		t.Fatal(err)
+	}
+	colls, _ := st.Collections(ctx)
+	if len(colls) != 1 || colls[0].Instructions != "„Senat“ meint den Akademischen Senat." {
+		t.Fatalf("collections: %+v", colls)
+	}
+	if st.SetCollectionInstructions(ctx, "x", "y") == nil {
+		t.Error("unknown collection accepted")
+	}
+	if st.CollectionInstructions(ctx, "x") != "" || st.CollectionInstructions(ctx, "") != "" {
+		t.Error("instructions for an unknown collection")
+	}
+}

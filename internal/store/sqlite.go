@@ -78,7 +78,10 @@ type Collection struct {
 	Color            string
 	SharedWithAgents bool
 	Folders          []string
-	DocCount         int
+	// Instructions are the user's notes for answers from this collection
+	// (style, terms); they never override the prompts' rules.
+	Instructions string
+	DocCount     int
 }
 
 type Document struct {
@@ -208,6 +211,18 @@ var indexSteps = []migrate.Step{
 		`DELETE FROM extract_cache WHERE document_id IN (SELECT id FROM documents WHERE format = 'PDF')`,
 		`UPDATE documents SET status = 'pending' WHERE format = 'PDF' AND status = 'ok'`,
 	)},
+	{Version: 5, Name: "collection instructions", Up: func(ctx context.Context, tx *sql.Tx) error {
+		// The app and an MCP process may migrate at the same time.
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM pragma_table_info('collections') WHERE name = 'instructions'`).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			_, err := tx.ExecContext(ctx, `ALTER TABLE collections ADD COLUMN instructions TEXT NOT NULL DEFAULT ''`)
+			return err
+		}
+		return nil
+	}},
 }
 
 func (s *Store) migrate(path string) error {
@@ -486,7 +501,7 @@ func (s *Store) Chunk(ctx context.Context, id int64) (Hit, error) {
 // ---- Collections ----
 
 func (s *Store) Collections(ctx context.Context) ([]Collection, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT c.id, c.name, c.color, c.shared_agents,
+	rows, err := s.db.QueryContext(ctx, `SELECT c.id, c.name, c.color, c.shared_agents, c.instructions,
 		(SELECT count(*) FROM documents d WHERE d.collection_id = c.id)
 		FROM collections c ORDER BY c.created_at`)
 	if err != nil {
@@ -495,7 +510,7 @@ func (s *Store) Collections(ctx context.Context) ([]Collection, error) {
 	var out []Collection
 	for rows.Next() {
 		var c Collection
-		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.SharedWithAgents, &c.DocCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.SharedWithAgents, &c.Instructions, &c.DocCount); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -537,8 +552,8 @@ func (s *Store) CreateCollection(ctx context.Context, c Collection) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO collections(id, name, color, shared_agents, created_at) VALUES (?, ?, ?, ?, ?)`,
-		c.ID, c.Name, c.Color, c.SharedWithAgents, time.Now().UnixNano()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO collections(id, name, color, shared_agents, instructions, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		c.ID, c.Name, c.Color, c.SharedWithAgents, c.Instructions, time.Now().UnixNano()); err != nil {
 		return err
 	}
 	for _, f := range c.Folders {
@@ -547,6 +562,26 @@ func (s *Store) CreateCollection(ctx context.Context, c Collection) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// SetCollectionInstructions stores the user's notes for a collection.
+func (s *Store) SetCollectionInstructions(ctx context.Context, id, text string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE collections SET instructions = ? WHERE id = ?`, text, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("unknown collection %q", id)
+	}
+	return nil
+}
+
+// CollectionInstructions returns the user's notes for a collection; "" for
+// none or an unknown collection.
+func (s *Store) CollectionInstructions(ctx context.Context, id string) string {
+	var text string
+	_ = s.db.QueryRowContext(ctx, `SELECT instructions FROM collections WHERE id = ?`, id).Scan(&text)
+	return text
 }
 
 func (s *Store) SetCollectionShared(ctx context.Context, id string, shared bool) error {

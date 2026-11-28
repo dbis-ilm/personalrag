@@ -26,6 +26,36 @@ function folderState(f: Folder): string {
 const FILTERS = ['', 'ok', 'pending', 'running', 'error', 'ocr']
 const isMac = document.documentElement.classList.contains('platform-mac')
 
+// MAX_NOTES matches rag.MaxInstructions; the backend caps longer text.
+const MAX_NOTES = 2000
+
+// NotesEditor edits a collection's notes for the answer model.
+function NotesEditor({ c, onDone }: { c: Collection; onDone: () => void }) {
+  const [text, setText] = useState(c.instructions ?? '')
+  const [saving, setSaving] = useState(false)
+  const id = `notes-${c.id}`
+  const save = () => {
+    setSaving(true)
+    AppService.SetCollectionInstructions(c.id, text)
+      .then(() => { toast(t('src.notesSaved', { name: c.name })); onDone() })
+      .catch((e) => toast(errorText(e), 'error'))
+      .finally(() => setSaving(false))
+  }
+  return (
+    <div className="field" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label htmlFor={id} style={{ fontSize: 12, fontWeight: 600 }}>{t('src.notesLabel', { name: c.name })}</label>
+      <textarea id={id} className="input" rows={4} maxLength={MAX_NOTES} value={text} onChange={(e) => setText(e.target.value)}
+        style={{ padding: '8px 10px', resize: 'vertical', lineHeight: 1.45 }} aria-describedby={`${id}-help`} autoFocus />
+      <span id={`${id}-help`} className="muted" style={{ fontSize: 12 }}>{t('src.notesHelp')}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="muted" style={{ fontSize: 12, flex: 1, fontVariantNumeric: 'tabular-nums' }}>{t('src.notesCount', { count: text.length, max: MAX_NOTES })}</span>
+        <button type="button" className="btn btn-sm" onClick={onDone}>{t('common.close')}</button>
+        <button type="button" className="btn btn-sm btn-primary" disabled={saving || text === (c.instructions ?? '')} onClick={save}>{saving ? t('common.saving') : t('common.save')}</button>
+      </div>
+    </div>
+  )
+}
+
 export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
@@ -33,6 +63,7 @@ export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }
   const [filter, setFilter] = useState('')
   const [query, setQuery] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [notesFor, setNotesFor] = useState('') // folder path whose notes editor is open
 
   const reload = useCallback(() => {
     AppService.Folders().then((v) => setFolders(v ?? [])).catch(console.error)
@@ -88,15 +119,20 @@ export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   <span className="tag">{f.collection}</span>
                   <span className="tag">{t('src.files', { count: f.files })}</span>
+                  {c?.instructions && <span className="tag">{t('src.notesSet')}</span>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className={`text-${f.stateKind}`} style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>{folderState(f)}</span>
+                  {c && notesFor !== f.path && (
+                    <button type="button" className="btn btn-sm" onClick={() => setNotesFor(f.path)}>{t('src.notes')}</button>
+                  )}
                   {c && (
                     <button type="button" className={`btn btn-sm${confirm === c.id ? ' btn-danger' : ''}`} onClick={() => remove(c)} onBlur={() => setConfirm('')}>
                       {confirm === c.id ? t('src.confirmRemove') : t('src.remove')}
                     </button>
                   )}
                 </div>
+                {c && notesFor === f.path && <NotesEditor c={c} onDone={() => setNotesFor('')} />}
               </div>
             )
           })}

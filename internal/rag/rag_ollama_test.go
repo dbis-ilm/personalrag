@@ -103,7 +103,7 @@ Kleintiere sind erlaubt. Hunde und Katzen nur nach schriftlicher Zustimmung.
 
 	var text strings.Builder
 	chunks := 0
-	ans, err := eng.Answer(ctx, q, res.Results, func(s string) { text.WriteString(s); chunks++ })
+	ans, err := eng.Answer(ctx, q, "", res.Results, func(s string) { text.WriteString(s); chunks++ })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ Kleintiere sind erlaubt. Hunde und Katzen nur nach schriftlicher Zustimmung.
 
 	// The same sources again add nothing to the answer: AnswerMore must not
 	// repeat it.
-	again, err := eng.AnswerMore(ctx, q, text.String(), res.Results)
+	again, err := eng.AnswerMore(ctx, q, "", text.String(), res.Results)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ Kleintiere sind erlaubt. Hunde und Katzen nur nach schriftlicher Zustimmung.
 		t.Fatalf("search (en): %v, %d results", err, len(resEN.Results))
 	}
 	var textEN strings.Builder
-	if _, err := eng.Answer(ctx, qEN, resEN.Results, func(s string) { textEN.WriteString(s) }); err != nil {
+	if _, err := eng.Answer(ctx, qEN, "", resEN.Results, func(s string) { textEN.WriteString(s) }); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("answer (en): %s", textEN.String())
