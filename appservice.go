@@ -94,6 +94,7 @@ type Collection struct {
 	DocCount         int      `json:"docCount"`
 	SharedWithAgents bool     `json:"sharedWithAgents"`
 	Folders          []string `json:"folders"`
+	Instructions     string   `json:"instructions"`
 }
 
 // ConversationSummary is one entry of the persistent chat history.
@@ -285,8 +286,9 @@ type AppService struct {
 }
 
 type cachedSearch struct {
-	question string
-	results  []rag.Result
+	question     string
+	results      []rag.Result
+	instructions string // the collection's notes for the answer model
 }
 
 // agentRuntime is what the agent mode needs: its model and the tools,
@@ -637,7 +639,7 @@ func (s *AppService) Collections() ([]Collection, error) {
 	}
 	out := make([]Collection, len(colls))
 	for i, cl := range colls {
-		out[i] = Collection{ID: cl.ID, Name: cl.Name, Color: cl.Color, DocCount: cl.DocCount, SharedWithAgents: cl.SharedWithAgents, Folders: cl.Folders}
+		out[i] = Collection{ID: cl.ID, Name: cl.Name, Color: cl.Color, DocCount: cl.DocCount, SharedWithAgents: cl.SharedWithAgents, Folders: cl.Folders, Instructions: cl.Instructions}
 	}
 	return out, nil
 }
@@ -793,6 +795,21 @@ func (s *AppService) SetCollectionShared(id string, shared bool) error {
 		return err
 	}
 	return c.st.SetCollectionShared(s.appCtx, id, shared)
+}
+
+// SetCollectionInstructions stores the user's notes for answers from a
+// collection (style, terms, background). They are added to the answer
+// prompts and the agent's task, below the prompts' own rules.
+func (s *AppService) SetCollectionInstructions(id, text string) error {
+	c, err := s.current()
+	if err != nil {
+		return err
+	}
+	if err := c.st.SetCollectionInstructions(s.appCtx, id, rag.Instructions(text)); err != nil {
+		return err
+	}
+	s.emit(EventSourcesChanged, SourcesChanged{At: time.Now().UnixMilli()})
+	return nil
 }
 
 // Rescan checks all folders for changes now.
@@ -1014,7 +1031,7 @@ func (s *AppService) Search(conversationID, question, collectionID, mode string)
 	out.Millis = int(time.Since(start).Milliseconds())
 
 	s.mu.Lock()
-	s.searches[out.TurnID] = cachedSearch{question: standalone, results: res.Results}
+	s.searches[out.TurnID] = cachedSearch{question: standalone, results: res.Results, instructions: c.st.CollectionInstructions(s.appCtx, collectionID)}
 	s.order = append(s.order, out.TurnID)
 	if len(s.order) > 20 {
 		delete(s.searches, s.order[0])
@@ -1048,11 +1065,12 @@ func (s *AppService) MoreSources(turnID int64) (MoreResult, error) {
 // page is one "show more" step: the new sources for the UI, the same
 // matches for the answer model, and whether more may follow.
 type page struct {
-	question string
-	sources  []Source
-	results  []rag.Result
-	shown    int // sources of the turn including this page
-	hasMore  bool
+	question     string
+	sources      []Source
+	results      []rag.Result
+	shown        int // sources of the turn including this page
+	hasMore      bool
+	instructions string // the collection's notes for the answer model
 }
 
 // nextPage finds the next matches of a turn and appends them to its stored
@@ -1073,7 +1091,7 @@ func (s *AppService) nextPage(c *core, turnID int64) (page, error) {
 			return page{}, err
 		}
 	}
-	out := page{question: firstNonEmpty(t.Standalone, t.Question), sources: []Source{}, shown: len(shown)}
+	out := page{question: firstNonEmpty(t.Standalone, t.Question), sources: []Source{}, shown: len(shown), instructions: c.st.CollectionInstructions(s.appCtx, conv.CollectionID)}
 	if len(shown) >= maxShown {
 		return out, nil
 	}
@@ -1163,7 +1181,7 @@ func (s *AppService) AskMore(turnID int64) error {
 				break
 			}
 			s.emit(EventAnswerSources, AnswerSources{TurnID: turnID, Sources: p.sources})
-			more, err := c.eng.AnswerMore(s.appCtx, p.question, answer, p.results)
+			more, err := c.eng.AnswerMore(s.appCtx, p.question, p.instructions, answer, p.results)
 			if err != nil {
 				lastErr = err
 				break
@@ -1227,7 +1245,7 @@ func (s *AppService) Ask(turnID int64) error {
 	go func() {
 		var text strings.Builder
 		lastSave := time.Now()
-		ans, err := c.eng.Answer(s.appCtx, cs.question, cs.results, func(t string) {
+		ans, err := c.eng.Answer(s.appCtx, cs.question, cs.instructions, cs.results, func(t string) {
 			text.WriteString(t)
 			s.emit(EventAnswerChunk, AnswerChunk{TurnID: turnID, Text: t})
 			if time.Since(lastSave) > time.Second {

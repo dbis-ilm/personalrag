@@ -157,7 +157,8 @@ func (e *Engine) SearchN(ctx context.Context, question, collectionID string, n i
 
 // Answer reranks the results, picks the relevant ones and streams an answer
 // that cites them by their numbers. onText receives text as it arrives.
-func (e *Engine) Answer(ctx context.Context, question string, results []Result, onText func(string)) (Answer, error) {
+// instructions are the user's notes for the collection ("" for none).
+func (e *Engine) Answer(ctx context.Context, question, instructions string, results []Result, onText func(string)) (Answer, error) {
 	if e.llm == nil {
 		return Answer{}, i18n.Errorf("core.noAnswerModel")
 	}
@@ -186,8 +187,9 @@ func (e *Engine) Answer(ctx context.Context, question string, results []Result, 
 	ctxText, nums := sourceContext(results, used)
 
 	opts := askyourdocs.PromptOptions(e.llm, e.llmConfig, map[string]any{
-		"context":  askyourdocs.WrapContext(ctxText),
-		"question": askyourdocs.SanitizeUntrusted(question),
+		"context":      askyourdocs.WrapContext(ctxText),
+		"question":     askyourdocs.SanitizeUntrusted(question),
+		"instructions": Instructions(instructions),
 	})
 	opts = append(opts, ai.WithStreaming(func(_ context.Context, c *ai.ModelResponseChunk) error {
 		if t := c.Text(); t != "" {
@@ -240,7 +242,7 @@ type MoreAnswer struct {
 // AnswerMore rates further sources of a question and, if any is relevant,
 // writes what they add to the previous answer. previous is cut to its last
 // 6,000 characters to leave room for the sources.
-func (e *Engine) AnswerMore(ctx context.Context, question, previous string, results []Result) (MoreAnswer, error) {
+func (e *Engine) AnswerMore(ctx context.Context, question, instructions, previous string, results []Result) (MoreAnswer, error) {
 	if e.llm == nil {
 		return MoreAnswer{}, i18n.Errorf("core.noAnswerModel")
 	}
@@ -263,9 +265,10 @@ func (e *Engine) AnswerMore(ctx context.Context, question, previous string, resu
 		previous = "…" + string(r[len(r)-6000:])
 	}
 	resp, err := e.qaMore.Execute(ctx, askyourdocs.PromptOptions(e.llm, e.llmConfig, map[string]any{
-		"context":  askyourdocs.WrapContext(ctxText),
-		"previous": askyourdocs.SanitizeUntrusted(previous),
-		"question": askyourdocs.SanitizeUntrusted(question),
+		"context":      askyourdocs.WrapContext(ctxText),
+		"previous":     askyourdocs.SanitizeUntrusted(previous),
+		"question":     askyourdocs.SanitizeUntrusted(question),
+		"instructions": Instructions(instructions),
 	})...)
 	if err != nil {
 		return MoreAnswer{}, err
@@ -356,4 +359,18 @@ func (e *Engine) ExtractPart(ctx context.Context, instruction, document, part, t
 		return "", err
 	}
 	return strings.TrimSpace(resp.Text()), nil
+}
+
+// MaxInstructions caps the user's notes for a collection (characters).
+const MaxInstructions = 2000
+
+// Instructions prepares the user's notes for a prompt: trimmed, capped at
+// MaxInstructions and without the tag that encloses them. They come from the
+// user, not from documents, but are still kept below the prompts' rules.
+func Instructions(text string) string {
+	text = strings.TrimSpace(strings.NewReplacer("<hinweise>", "", "</hinweise>", "").Replace(text))
+	if r := []rune(text); len(r) > MaxInstructions {
+		text = strings.TrimSpace(string(r[:MaxInstructions]))
+	}
+	return text
 }

@@ -2,3 +2,7 @@
 # even on Windows checkouts with core.autocrlf=true.
 Dockerfile text eol=lf
 *.sh       text eol=lf
+
+# Prompts are embedded into the binary; keep them byte-identical on every
+# platform (Windows checkouts would otherwise embed CRLF).
+*.prompt   text eol=lf
