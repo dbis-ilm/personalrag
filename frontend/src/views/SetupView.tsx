@@ -57,6 +57,14 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
 
   useEffect(() => { setConsent(false) }, [llm, emb, agent])
 
+  // While the wizard waits for a model service (Ollama being installed or
+  // started), check again every few seconds.
+  useEffect(() => {
+    if (mode !== 'wizard' || step !== 0 || anyOK || !rt) return
+    const id = window.setInterval(() => { if (!checking) check() }, 5000)
+    return () => window.clearInterval(id)
+  }, [mode, step, anyOK, rt, checking, check])
+
   const saveModels = async (): Promise<boolean> => {
     setSaving(true)
     try {
@@ -79,7 +87,23 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
 
   const finish = () => AppService.FinishSetup().catch((e) => toast(errorText(e), 'error'))
 
-  const connectionBlock = <Connections ollama={ollama} gpu={gpu} checking={checking} onRecheck={check} compact={mode === 'wizard'} />
+  const connectionBlock = (
+    <>
+      {mode === 'wizard' && rt && !anyOK && (
+        <div className="notice" role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14, border: '1px solid var(--line)', borderRadius: 10, background: 'var(--surface-2, var(--surface))' }}>
+          <strong>{t('setup.noService')}</strong>
+          <span style={{ fontSize: 13, lineHeight: 1.5 }}>{t('setup.noServiceLead')}</span>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+            <li>{t('setup.optLocal')} <button type="button" className="link" onClick={() => AppService.OpenHelp('ollama').catch(() => {})}>{t('setup.getOllama')}</button></li>
+            <li>{t('setup.optRemoteOllama')}</li>
+            <li>{t('setup.optGpustack')} <button type="button" className="link" onClick={() => AppService.OpenHelp('gpustack').catch(() => {})}>{t('setup.aboutGpustack')}</button></li>
+          </ul>
+          <span className="muted" style={{ fontSize: 12 }}>{t('setup.autoRecheck')}</span>
+        </div>
+      )}
+      <Connections ollama={ollama} gpu={gpu} checking={checking} onRecheck={check} compact={mode === 'wizard'} />
+    </>
+  )
 
   const modelBlock = (
     <>
@@ -175,6 +199,15 @@ export default function SetupView({ mode, status, collections, onAddFolder, onHi
         <span style={{ fontWeight: 600, color: 'var(--text)' }}>{collections.length ? t('setup.addAnother') : t('setup.chooseFolder')}</span>
         <span style={{ fontSize: 12 }}>{t('setup.formats')}</span>
       </button>
+      {mode === 'wizard' && !collections.some((c) => c.id.startsWith('demo-')) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button type="button" className="btn" style={{ minHeight: 38 }}
+            onClick={() => AppService.AddDemo().then((n) => n > 0 && toast(t('demo.added', { count: n }), 'ok')).catch((e) => toast(errorText(e), 'error'))}>
+            {t('setup.startWithDemo')}
+          </button>
+          <span className="muted" style={{ fontSize: 12, flex: 1, minWidth: 220 }}>{t('demo.hint')}</span>
+        </div>
+      )}
     </>
   )
 

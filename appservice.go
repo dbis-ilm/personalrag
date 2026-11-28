@@ -1649,6 +1649,22 @@ func (s *AppService) About() AboutInfo {
 
 // OpenRepository opens the project page (or a page below it, e.g.
 // "blob/main/LICENSE") in the default browser.
+// helpPages are the external pages the app links to; OpenHelp opens no
+// other address.
+var helpPages = map[string]string{
+	"ollama":   "https://ollama.com/download",
+	"gpustack": "https://docs.gpustack.ai/",
+}
+
+// OpenHelp opens one of the fixed help pages in the browser.
+func (s *AppService) OpenHelp(page string) error {
+	u, ok := helpPages[page]
+	if !ok {
+		return fmt.Errorf("unknown help page %q", page)
+	}
+	return application.Get().Browser.OpenURL(u)
+}
+
 func (s *AppService) OpenRepository(page string) error {
 	u := repository
 	if page = strings.Trim(page, "/"); page != "" {

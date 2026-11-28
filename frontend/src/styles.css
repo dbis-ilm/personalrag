@@ -345,3 +345,4 @@ mark.term { background: transparent; color: var(--accent-text); font-weight: 650
 .agent-remote { margin: 0 auto 8px; max-width: 760px; width: calc(100% - 32px); }
 
 .demo-question { justify-content: flex-start; gap: 10px; min-height: 36px; text-align: left; white-space: normal; line-height: 1.35; padding: 6px 10px; }
+.link { border: 0; background: none; padding: 0; color: var(--accent, #2452B8); text-decoration: underline; cursor: pointer; font: inherit; }

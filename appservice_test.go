@@ -155,3 +155,15 @@ func TestServiceWithOllama(t *testing.T) {
 		t.Fatalf("conversation not deleted: %+v", list)
 	}
 }
+
+func TestOpenHelpOnlyKnownPages(t *testing.T) {
+	s := &AppService{}
+	if err := s.OpenHelp("https://example.org"); err == nil {
+		t.Error("opened an arbitrary address")
+	}
+	for page, u := range helpPages {
+		if !strings.HasPrefix(u, "https://") {
+			t.Errorf("%s: %s is not https", page, u)
+		}
+	}
+}
