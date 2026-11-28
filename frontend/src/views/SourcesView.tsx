@@ -104,6 +104,10 @@ export default function SourcesView({ onAddFolder }: { onAddFolder: () => void }
             <p className="lead">{t('src.lead')}</p>
           </div>
           <button type="button" className="btn" style={{ minHeight: 34 }} onClick={() => act(AppService.Rescan(), t('src.rescanning'))}>{t('src.rescan')}</button>
+          <button type="button" className="btn" style={{ minHeight: 34 }} title={t('demo.hint')}
+            onClick={() => AppService.AddDemo().then((n) => toast(n > 0 ? t('demo.added', { count: n }) : t('demo.present'))).catch((e) => toast(errorText(e), 'error'))}>
+            {t('demo.add')}
+          </button>
           <button type="button" className="btn btn-primary" style={{ minHeight: 34 }} onClick={onAddFolder}><Icon name="plus" size={14} strokeWidth={2.2} />{t('common.addFolder')}</button>
         </div>
 

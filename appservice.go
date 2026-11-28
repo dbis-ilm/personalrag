@@ -794,6 +794,7 @@ func (s *AppService) RemoveCollection(id string) error {
 	if c.ix != nil {
 		c.ix.RefreshWatch(s.appCtx)
 	}
+	s.removeDemoFiles(id)
 	s.sourcesChanged()
 	return nil
 }
