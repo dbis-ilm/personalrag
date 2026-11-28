@@ -80,6 +80,13 @@ func loadDemoCases(t *testing.T) []demoCase {
 	return f.Cases
 }
 
+func TestCountQuestions(t *testing.T) {
+	a := "**Frage 1: Erklären Sie ACID.**\nLösung …\n**Frage 2: Was ist 2PL?**\n### Aufgabe 3\nQuestion 4: Explain WAL."
+	if n := countQuestions(a); n != 4 {
+		t.Errorf("countQuestions = %d, want 4", n)
+	}
+}
+
 // The cases file must parse and name folders that exist; this runs always.
 func TestDemoCasesParse(t *testing.T) {
 	cases := loadDemoCases(t)
@@ -186,9 +193,18 @@ func checkConcepts(c demoCase, answer string, o *benchResult) {
 	if len(excluded) > 0 {
 		o.fail("fremde Begriffe: %s", strings.Join(excluded, ", "))
 	}
-	if q := strings.Count(answer, "?"); q < c.Expect.MinQuestions {
+	if q := countQuestions(answer); q < c.Expect.MinQuestions {
 		o.fail("%d Fragen statt mindestens %d", q, c.Expect.MinQuestions)
 	}
+}
+
+var numberedQuestionRE = regexp.MustCompile(`(?im)^\W*(frage|aufgabe|question|q)\s*\d+`)
+
+// countQuestions counts the questions in an answer: question marks, or
+// numbered "Frage 3" / "Aufgabe 3" / "Question 3" headings for tasks
+// phrased as instructions ("Erklären Sie …").
+func countQuestions(answer string) int {
+	return max(strings.Count(answer, "?"), len(numberedQuestionRE.FindAllString(answer, -1)))
 }
 
 func checkContains(c demoCase, answer string, o *benchResult) {
