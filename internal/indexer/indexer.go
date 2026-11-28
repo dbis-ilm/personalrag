@@ -19,6 +19,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 
 	"github.com/dbis-ilm/personalrag/internal/ingest"
+	"github.com/dbis-ilm/personalrag/internal/ocr"
 	"github.com/dbis-ilm/personalrag/internal/paths"
 	"github.com/dbis-ilm/personalrag/internal/store"
 	"github.com/dbis-ilm/personalrag/internal/watcher"
@@ -53,7 +54,8 @@ type fileInput struct {
 
 type fileResult struct {
 	Chunks int  `json:"chunks"`
-	OCR    bool `json:"ocr"`
+	OCR    bool `json:"ocr"`   // scanned, no text recognition here
+	OCRed  bool `json:"ocred"` // text came from text recognition
 }
 
 type Indexer struct {
@@ -85,7 +87,7 @@ func New(g *genkit.Genkit, st *store.Store, onProgress func(Progress), onChange 
 		queued: map[string]bool{}, wake: make(chan struct{}, 1), collName: map[string]string{},
 	}
 	ix.flow = genkit.DefineFlow(g, "indexFile", func(ctx context.Context, in fileInput) (fileResult, error) {
-		paras, err := ingest.Extract(in.Path)
+		paras, ocred, err := ingest.Extract(ctx, in.Path)
 		if errors.Is(err, ingest.ErrNeedsOCR) {
 			_, err := st.DeleteChunks(ctx, in.DocumentID)
 			return fileResult{OCR: true}, err
@@ -95,7 +97,7 @@ func New(g *genkit.Genkit, st *store.Store, onProgress func(Progress), onChange 
 		}
 		src := &ingest.FileSource{Path: in.Path, DocumentID: in.DocumentID, CollectionID: in.CollectionID, Paragraphs: paras}
 		n, _, err := askyourdocs.IndexSource(ctx, st, src, chunkSize, chunkOverlap, nil)
-		return fileResult{Chunks: n}, err
+		return fileResult{Chunks: n, OCRed: ocred}, err
 	})
 	return ix
 }
@@ -335,6 +337,8 @@ func (ix *Indexer) check(ctx context.Context, path string, info fs.FileInfo, col
 		return true, true, nil
 	case doc.Status == store.StatusPending || doc.Status == store.StatusRunning:
 		return true, false, nil
+	case doc.Status == store.StatusOCR && ocr.Available():
+		return true, false, nil // marked "needs OCR" before; this system can read it now
 	case doc.Size != info.Size() || doc.ModTime != info.ModTime().Unix():
 		h, err := ingest.HashFile(path)
 		if err == nil && h == doc.Hash && doc.Status == store.StatusOK {
@@ -576,8 +580,11 @@ func (ix *Indexer) process(ctx context.Context, j job) {
 	}
 	n := res.Chunks
 	note := ""
-	if n == 0 {
+	switch {
+	case n == 0:
 		note = NoteNoText
+	case res.OCRed:
+		note = NoteOCRRead
 	}
 	_ = ix.st.SetDocumentState(ctx, id, store.StatusOK, note, hash)
 	slog.Debug("indexed", "path", j.path, "chunks", n)
@@ -595,6 +602,7 @@ const (
 	NoteNeedsOCR             = "@ocr"
 	NoteEmbeddingUnreachable = "@embedding-unreachable"
 	NoteNoText               = "@no-text"
+	NoteOCRRead              = "@ocr-read" // indexed from text recognition
 	NoteEncrypted            = "@encrypted"
 	NoteCorrupt              = "@corrupt"
 )
