@@ -59,7 +59,9 @@ jobs:
 
       - name: Install NSIS
         if: runner.os == 'Windows'
-        run: choco install nsis -y --no-progress
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> "$GITHUB_PATH"
 
       - uses: actions/setup-go@v5
         with:
@@ -108,21 +110,30 @@ jobs:
         env:
           V: ${{ steps.version.outputs.version }}
         run: |
+          # macOS ships bash 3.2: no globstar, so find locates the packages.
+          first() { find "$@" -type f 2>/dev/null | head -n 1; }
           mkdir -p dist
-          shopt -s nullglob globstar
+          ls -la bin
           case "$RUNNER_OS" in
             macOS)
               ditto -c -k --keepParent bin/PersonalRAG.app "dist/PersonalRAG-$V-macos-universal.zip"
-              for f in bin/*.dmg; do cp "$f" "dist/PersonalRAG-$V-macos-universal.dmg"; done
+              dmg="$(first bin -maxdepth 2 -name '*.dmg')"
+              test -n "$dmg" || { echo "no .dmg in bin"; exit 1; }
+              cp "$dmg" "dist/PersonalRAG-$V-macos-universal.dmg"
               ;;
             Windows)
-              for f in bin/*installer*.exe; do cp "$f" "dist/PersonalRAG-$V-windows-amd64-setup.exe"; done
+              setup="$(first bin -maxdepth 2 -iname '*installer*.exe')"
+              test -n "$setup" || { echo "no installer in bin"; exit 1; }
+              cp "$setup" "dist/PersonalRAG-$V-windows-amd64-setup.exe"
               7z a -tzip "dist/PersonalRAG-$V-windows-amd64.zip" ./bin/PersonalRAG.exe > /dev/null
               ;;
             Linux)
               tar -C bin -czf "dist/PersonalRAG-$V-linux-amd64.tar.gz" PersonalRAG
-              for f in bin/*.deb; do cp "$f" "dist/PersonalRAG-$V-linux-amd64.deb"; done
-              for f in bin/**/*.AppImage build/linux/appimage/**/*.AppImage; do cp "$f" "dist/PersonalRAG-$V-linux-x86_64.AppImage"; break; done
+              deb="$(first bin -maxdepth 2 -name '*.deb')"
+              test -n "$deb" || { echo "no .deb in bin"; exit 1; }
+              cp "$deb" "dist/PersonalRAG-$V-linux-amd64.deb"
+              img="$(first bin build/linux/appimage -name '*.AppImage')"
+              if [ -n "$img" ]; then cp "$img" "dist/PersonalRAG-$V-linux-x86_64.AppImage"; fi
               ;;
           esac
           ls -la dist
