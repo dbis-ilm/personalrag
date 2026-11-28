@@ -9,13 +9,14 @@ import (
 	"strings"
 )
 
-// Use case 1: minutes of a university senate. Twelve sessions with the
-// layout that broke real extraction: participants in a left column next to
-// guests and excused members on the right, headings sometimes one text
-// object padded with spaces, titles, a deputy "i. V.", names in the running
-// text, and one session only as a scan. All names are invented.
+// Use case 1: minutes of a sports club's committee. Twelve sessions with
+// the layout that broke real extraction: participants in a left column next
+// to guests and excused members on the right, headings sometimes one text
+// object padded with spaces, a deputy "i. V.", names in the running text,
+// and one session only as a scan. All names are invented.
 
 const (
+	clubName     = "TSV Musterstadt 1890 e.V."
 	firstSession = 41
 	sessions     = 12
 	scanSession  = 47 // only as an image; needs OCR
@@ -25,29 +26,29 @@ const (
 	listLH       = 4.6
 )
 
-// member is a senate member with the chance to attend a session.
+// member is a committee member with the chance to attend a session.
 type member struct {
 	name   string // with salutation and title, as printed
 	chance float64
 }
 
 var members = []member{
-	{"Herr Prof. Dr. Martin Albers", 1}, // president, chairs every session
-	{"Frau Prof. Dr. Helga Brandt", 0.9},
-	{"Herr Prof. Dr. Stefan Kuhlmann", 0.8},
-	{"Frau Prof. Dr. Ines Wörner", 0.55},
-	{"Herr Prof. Dr. Jörg Feldmann", 0.95},
-	{"Frau Prof. Dr. Katrin Lenz", 0.7},
-	{"Herr Prof. Dr. Peter Sommer", 0.45},
-	{"Herr Prof. Dr. Ralf Ostermann", 0.85},
-	{"Frau Prof. Dr. Birgit Hollmann", 0.75},
-	{"Herr Prof. Dr. Thomas Engel", 0.6},
-	{"Herr Prof. Dr. Andreas Vogt", 0.9},
-	{"Frau Prof. Dr. Susanne Pohl", 0.65},
-	{"Herr Prof. Dr. Klaus Reimers", 0.8},
-	{"Herr Dr. Frank Lindner", 0.95},
-	{"Frau Dr. Julia Hartwig", 0.7},
-	{"Herr Dr. Oliver Kranz", 0.5},
+	{"Herr Martin Albers", 1}, // chairman, chairs every session
+	{"Frau Helga Brandt", 0.9},
+	{"Herr Stefan Kuhlmann", 0.8},
+	{"Frau Dr. Ines Wörner", 0.55},
+	{"Herr Jörg Feldmann", 0.95},
+	{"Frau Katrin Lenz", 0.7},
+	{"Herr Peter Sommer", 0.45},
+	{"Herr Ralf Ostermann", 0.85},
+	{"Frau Birgit Hollmann", 0.75},
+	{"Herr Dr. Thomas Engel", 0.6},
+	{"Herr Andreas Vogt", 0.9},
+	{"Frau Susanne Pohl", 0.65},
+	{"Herr Klaus Reimers", 0.8},
+	{"Herr Frank Lindner", 0.95},
+	{"Frau Julia Hartwig", 0.7},
+	{"Herr Oliver Kranz", 0.5},
 	{"Frau Sabine Möller", 0.85},
 	{"Herr Uwe Brenner", 0.75},
 	{"Frau Lea Schubert", 0.6},
@@ -62,13 +63,14 @@ var members = []member{
 	{"Herr Dirk Hansen", 0.5},
 }
 
-// Guests attend often but are not participants; the chancellor and the
-// minute taker attend every session.
+// Guests attend often but are not participants; the treasurer's auditor
+// and the minute taker attend every session.
 var (
-	regularGuests = []string{"Frau Dr. Renate Kühn", "Herr Michael Bauer"}
-	otherGuests   = []string{"Frau Nina Albrecht", "Herr Dr. Georg Wiese", "Frau Claudia Reuter", "Herr Simon Krause", "Frau Dr. Lisa Hoffmann"}
-	topGuests     = []string{"Frau Prof. Dr. Eva Kirchner", "Herr Prof. Dr. Paul Ritter", "Herr Prof. Dr. Henrik Lorenz", "Frau Prof. Dr. Marion Busch"}
-	// deputy stands in for an absent student member in some sessions.
+	regularGuests = []string{"Frau Renate Kühn", "Herr Michael Bauer"}
+	otherGuests   = []string{"Frau Nina Albrecht", "Herr Georg Wiese", "Frau Claudia Reuter", "Herr Simon Krause", "Frau Lisa Hoffmann"}
+	topGuests     = []string{"Frau Eva Kirchner", "Herr Paul Ritter", "Herr Henrik Lorenz", "Frau Marion Busch"}
+	// deputy stands in for the absent youth representative in some
+	// sessions.
 	deputy       = "Herr Tim Köhler"
 	deputyFor    = 18 // Frau Lea Schubert
 	deputyInSess = []int{44, 49, 52}
@@ -79,7 +81,7 @@ type session struct {
 	date     string   // "4. März 2025"
 	dateNum  string   // "04.03.2025"
 	present  []string // participant list as printed (members, deputy line)
-	guests   []string // as printed
+	guests   []string // as printed, without the TOP guest
 	excused  []string
 	tops     []top
 	splitHdr bool // headings as one text object padded with spaces
@@ -125,7 +127,7 @@ func buildSessions() []session {
 		if withDeputy {
 			s.present = append(s.present, deputy+" (i. V. Frau Schubert)")
 		}
-		s.guests = append(s.guests, regularGuests[0]+" (Kanzlerin)", regularGuests[1]+" (Protokoll)")
+		s.guests = append(s.guests, regularGuests[0]+" (Kassenprüferin)", regularGuests[1]+" (Protokoll)")
 		for _, g := range otherGuests {
 			if rng.Float64() < 0.3 {
 				s.guests = append(s.guests, g)
@@ -151,74 +153,74 @@ func sessionTops(n int, s session, rng *rand.Rand) []top {
 	guest := topGuests[n%len(topGuests)]
 	tops := []top{{
 		title: "Begrüßung, Feststellung der Beschlussfähigkeit, Genehmigung der Tagesordnung",
-		body:  []string{fmt.Sprintf("Der Präsident, %s, begrüßt die Mitglieder und Gäste und stellt die Beschlussfähigkeit fest. Die Tagesordnung wird ohne Änderungen genehmigt. %s hat sich für die heutige Sitzung entschuldigt.", strings.TrimPrefix(members[0].name, "Herr "), absent)},
+		body:  []string{fmt.Sprintf("Der Vorsitzende, %s, begrüßt die Mitglieder des Ausschusses und die Gäste und stellt die Beschlussfähigkeit fest. Die Tagesordnung wird ohne Änderungen genehmigt. %s hat sich für die heutige Sitzung entschuldigt.", strings.TrimPrefix(members[0].name, "Herr "), absent)},
 	}}
 	reports := []string{
-		"Der Präsident berichtet über die Ergebnisse der Zielvereinbarungen mit dem Land. Die Hochschule erhält ab dem kommenden Jahr zusätzliche Mittel für die Digitalisierung der Lehre.",
-		"Der Präsident informiert über die Akkreditierung der Studiengänge der Fakultät für Informatik, die ohne Auflagen abgeschlossen wurde.",
-		"Der Präsident berichtet über die Gespräche mit der Stadt zur Anbindung des Campus an den Nahverkehr. Ab dem Wintersemester verkehrt die Buslinie 5 im Zehnminutentakt.",
-		"Der Präsident gratuliert den Preisträgerinnen und Preisträgern des Forschungspreises und informiert über die Exzellenzstrategie.",
+		"Der Vorsitzende berichtet über die Mitgliederentwicklung. Der Verein hat derzeit 1.284 Mitglieder, 37 mehr als zu Jahresbeginn; der größte Zuwachs entfällt auf die Abteilung Turnen.",
+		"Der Vorsitzende informiert über die Gespräche mit der Stadt zur Nutzung der Sporthalle am Lindenweg. Ab dem Herbst stehen dem Verein dienstags und donnerstags zusätzliche Hallenzeiten zur Verfügung.",
+		"Der Vorsitzende berichtet vom Kreissporttag. Die Fußball-A-Jugend ist in die Bezirksliga aufgestiegen; der Ausschuss gratuliert Mannschaft und Trainerteam.",
+		"Der Vorsitzende informiert über die Ehrungen langjähriger Mitglieder beim Neujahrsempfang und die Planung des Sommerfests am Sportplatz.",
 	}
 	ref := s.excused[rng.IntN(len(s.excused))]
 	tops = append(tops, top{
-		title: "Bericht des Präsidenten",
+		title: "Bericht des Vorsitzenden",
 		body: []string{reports[n%len(reports)],
-			fmt.Sprintf("%s hat dazu vorab eine schriftliche Stellungnahme eingereicht, die dem Protokoll beiliegt. Nachfragen beantwortet die Kanzlerin, Frau Dr. Renate Kühn.", ref)},
+			fmt.Sprintf("%s hat dazu vorab eine schriftliche Stellungnahme eingereicht, die dem Protokoll beiliegt. Nachfragen beantwortet die Kassenprüferin, Frau Renate Kühn.", ref)},
 	})
 	switch n {
 	case 42:
 		tops = append(tops, top{
-			title: "Wirtschaftsplan 2025 der Hochschule",
-			body: []string{"Die Kanzlerin, Frau Dr. Renate Kühn, erläutert den Entwurf des Wirtschaftsplans 2025. Die Personalausgaben steigen um 3,1 Prozent, die Sachmittel der Fakultäten bleiben unverändert. Für die Sanierung des Hörsaalgebäudes werden 2,4 Mio. € eingeplant.",
-				"In der Aussprache wird nach den Rücklagen für Berufungen gefragt; sie betragen 1,8 Mio. €."},
-			decision: "Beschluss: Der Senat stimmt dem Wirtschaftsplan 2025 zu. " + votes(s, rng, 1),
+			title: "Haushaltsplan 2025",
+			body: []string{"Der Kassenwart erläutert den Entwurf des Haushaltsplans 2025. Die Mitgliedsbeiträge bringen 186.000 €, die Hallenmieten steigen um 6 Prozent. Für die Erneuerung der Flutlichtanlage werden 42.000 € eingeplant.",
+				"In der Aussprache wird nach der Rücklage für das Vereinsheim gefragt; sie beträgt 58.000 €."},
+			decision: "Beschluss: Der Vereinsausschuss stimmt dem Haushaltsplan 2025 zu und empfiehlt ihn der Mitgliederversammlung. " + votes(s, rng, 1),
 		})
 	case 45:
 		tops = append(tops, top{
-			title: "Neufassung der Bibliotheksordnung (erste Lesung)",
-			body: []string{"Die Leiterin der Bibliothek stellt den Entwurf der neuen Bibliotheksordnung vor. Neu sind die Ausleihfristen für Abschlussarbeiten und die Regeln für Gruppenarbeitsräume.",
-				"Der Senat diskutiert den Entwurf. Die Beschlussfassung erfolgt in einer späteren Sitzung, wenn die Stellungnahme der Studierendenvertretung vorliegt."},
+			title: "Neue Beitragsordnung (erste Lesung)",
+			body: []string{"Der Kassenwart stellt den Entwurf der neuen Beitragsordnung vor. Neu sind ein Familienbeitrag und ermäßigte Beiträge für Auszubildende und Studierende.",
+				"Der Ausschuss diskutiert den Entwurf. Die Beschlussfassung erfolgt in einer späteren Sitzung, wenn die Stellungnahmen der Abteilungen vorliegen."},
 		})
 	case 46:
 		tops = append(tops, top{
-			title: "Bericht zur Haushaltslage",
-			body: []string{"Die Kanzlerin berichtet über die Haushaltslage zum Halbjahr. Die Energiekosten liegen 12 Prozent über dem Plan; ein Nachtragshaushalt wird vorbereitet.",
-				"Der Senat nimmt den Bericht zur Kenntnis. Ein Beschluss wird nicht gefasst."},
+			title: "Kassenbericht zum Halbjahr",
+			body: []string{"Der Kassenwart berichtet über die Kassenlage zum Halbjahr. Die Energiekosten des Vereinsheims liegen 15 Prozent über dem Plan; ein Nachtragshaushalt wird vorbereitet.",
+				"Der Ausschuss nimmt den Bericht zur Kenntnis. Ein Beschluss wird nicht gefasst."},
 		})
 	case 47:
 		tops = append(tops, top{
-			title: "Neubau der Mensa am Campus Nord",
-			body:  []string{"Das Studierendenwerk stellt die Planung für den Neubau der Mensa am Campus Nord vor. Baubeginn ist im Frühjahr 2026, die Fertigstellung ist für das Wintersemester 2027 geplant. Während der Bauzeit wird eine Interimsmensa im Foyer des Hörsaalgebäudes eingerichtet."},
+			title: "Neubau des Vereinsheims",
+			body:  []string{"Der Bauausschuss stellt die Planung für den Neubau des Vereinsheims am Sportplatz vor. Baubeginn ist im Frühjahr 2026, die Fertigstellung ist für den Herbst 2027 geplant. Während der Bauzeit nutzt der Verein Container als Umkleiden und Geschäftsstelle."},
 		})
 	case 48:
 		tops = append(tops, top{
-			title:    "Neufassung der Bibliotheksordnung",
-			body:     []string{"Die Stellungnahme der Studierendenvertretung liegt vor; ihre Anregung zu längeren Öffnungszeiten in der Prüfungszeit wurde übernommen."},
-			decision: "Beschluss: Der Senat beschließt die Neufassung der Bibliotheksordnung in der vorgelegten Fassung. " + votes(s, rng, 0),
+			title:    "Neue Beitragsordnung",
+			body:     []string{"Die Stellungnahmen der Abteilungen liegen vor; die Anregung der Abteilung Schwimmen zu einem Kursbeitrag wurde übernommen."},
+			decision: "Beschluss: Der Vereinsausschuss beschließt die neue Beitragsordnung in der vorgelegten Fassung. " + votes(s, rng, 0),
 		})
 	case 51:
 		tops = append(tops, top{
 			title:    "Nachtragshaushalt 2025",
-			body:     []string{"Die Kanzlerin legt den Nachtragshaushalt 2025 vor. Die Mehrkosten für Energie von 1,2 Mio. € werden aus Rücklagen gedeckt."},
-			decision: "Beschluss: Der Senat stimmt dem Nachtragshaushalt 2025 zu. " + votes(s, rng, 2),
+			body:     []string{"Der Kassenwart legt den Nachtragshaushalt 2025 vor. Die Mehrkosten für Energie von 9.500 € werden aus der Rücklage gedeckt."},
+			decision: "Beschluss: Der Vereinsausschuss stimmt dem Nachtragshaushalt 2025 zu. " + votes(s, rng, 2),
 		})
 	}
-	fields := []string{"Elektrotechnik", "Maschinenbau", "Informatik", "Mathematik", "Wirtschaftswissenschaften", "Medienwissenschaft"}
-	f := fields[n%len(fields)]
+	sections := []string{"Fußball", "Handball", "Turnen", "Leichtathletik", "Schwimmen", "Tischtennis"}
+	sec := sections[n%len(sections)]
 	tops = append(tops, top{
-		title:    fmt.Sprintf("Berufungsvorschlag für die W3-Professur „%s“", "Grundlagen der "+f),
-		body:     []string{fmt.Sprintf("%s berichtet für die Berufungskommission über das Verfahren. Es gingen %d Bewerbungen ein, vier Personen wurden zu Vorträgen eingeladen.", guest, 18+rng.IntN(30))},
-		decision: "Beschluss: Der Senat nimmt zum Berufungsvorschlag zustimmend Stellung. " + votes(s, rng, 0),
+		title:    fmt.Sprintf("Bericht der Abteilung %s", sec),
+		body:     []string{fmt.Sprintf("%s berichtet für die Abteilung %s über den Trainingsbetrieb. Die Abteilung hat %d aktive Mitglieder; für die neue Saison werden zwei weitere Übungsleiter gesucht.", guest, sec, 40+rng.IntN(120))},
+		decision: fmt.Sprintf("Beschluss: Der Vereinsausschuss bewilligt der Abteilung %s einen Zuschuss von %d € für Trainingsmaterial. ", sec, 500+100*rng.IntN(20)) + votes(s, rng, 0),
 	})
 	tops = append(tops, top{
 		title: "Termine und Sonstiges",
-		body:  []string{fmt.Sprintf("Die nächste Sitzung findet am ersten Dienstag des Folgemonats statt. Unter Sonstiges weist %s auf die Ausschreibung der Lehrpreise hin.", s.guests[0][:strings.Index(s.guests[0], " (")])},
+		body:  []string{fmt.Sprintf("Die nächste Sitzung findet am ersten Dienstag des Folgemonats im Vereinsheim statt. Unter Sonstiges weist %s auf die Anmeldung zum Vereinslauf hin.", s.guests[0][:strings.Index(s.guests[0], " (")])},
 	})
 	return tops
 }
 
-// printedGuests is the guest list including the TOP guest added by
-// sessionTops.
+// printedGuests is the guest list including the guest reporting for a
+// section.
 func (s session) printedGuests() []string {
 	guest := topGuests[s.number%len(topGuests)]
 	return append(slices.Clone(s.guests), guest+fmt.Sprintf(" (TOP %d)", len(s.tops)-1))
@@ -226,13 +228,17 @@ func (s session) printedGuests() []string {
 
 func (s session) file() string { return fmt.Sprintf("protokoll-%d.pdf", s.number) }
 
+func (s session) title() string {
+	return fmt.Sprintf("Protokoll der %d. Sitzung des Vereinsausschusses", s.number)
+}
+
 func (s session) layout() (*layout, error) {
-	l := newLayout(fmt.Sprintf("Protokoll der %d. Sitzung des Senats", s.number))
-	l.at(colLeft, 11, true, "Hochschule Musterstadt")
+	l := newLayout(s.title())
+	l.at(colLeft, 11, true, clubName)
 	l.at(150, 10, false, "Musterstadt, "+s.dateNum)
 	l.gap(5)
-	l.line(colLeft, 9, false, "Der Präsident", 12)
-	l.line(colLeft, 13, true, fmt.Sprintf("Protokoll der %d. Sitzung des Senats am %s", s.number, s.date), 10)
+	l.line(colLeft, 9, false, "Der Vorstand", 12)
+	l.line(colLeft, 13, true, fmt.Sprintf("%s am %s", s.title(), s.date), 10)
 
 	if s.splitHdr {
 		// One text object; spaces fill the gap up to the right column.
@@ -277,14 +283,14 @@ func (s session) layout() (*layout, error) {
 	}
 	l.gap(6)
 	l.line(colLeft, 10, false, "Musterstadt, "+s.dateNum, 5)
-	l.line(colLeft, 10, false, "gez. Michael Bauer (Protokoll)        gez. Prof. Dr. Martin Albers (Präsident)", 5)
+	l.line(colLeft, 10, false, "gez. Michael Bauer (Protokoll)        gez. Martin Albers (Vorsitzender)", 5)
 	return l, nil
 }
 
 var titleRE = regexp.MustCompile(`^(Frau|Herr)\s+|(Prof\.|Dr\.)\s+|\s*\(.*\)$`)
 
-// personName strips salutation, titles and a trailing remark: "Herr Prof.
-// Dr. Martin Albers (Vorsitz)" → "Martin Albers".
+// personName strips salutation, titles and a trailing remark: "Herr Dr.
+// Thomas Engel (Vorsitz)" → "Thomas Engel".
 func personName(printed string) string {
 	s := strings.TrimSpace(printed)
 	for {
@@ -313,12 +319,11 @@ func writeProtocols(dir string, ss []session) error {
 		if err != nil {
 			return err
 		}
-		title := fmt.Sprintf("Protokoll der %d. Sitzung des Senats", s.number)
 		path := filepath.Join(dir, s.file())
 		if s.number == scanSession {
-			err = l.writeScan(path, title)
+			err = l.writeScan(path, s.title())
 		} else {
-			err = l.writePDF(path, title)
+			err = l.writePDF(path, s.title())
 		}
 		if err != nil {
 			return err

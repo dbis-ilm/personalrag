@@ -116,22 +116,24 @@ func TestProtocolsExtract(t *testing.T) {
 	}
 }
 
+var carRE = regexp.MustCompile(`Dienstwagen|Firmenwagen|Dienstfahrzeug`)
+
 func TestOffersExtract(t *testing.T) {
 	offers := buildOffers()
-	hits, _ := equipmentFiles(offers)
+	hits, _ := carFiles(offers)
 	if len(hits) != 9 {
-		t.Fatalf("%d offers mention Großgeräte", len(hits))
+		t.Fatalf("%d offers with a company car", len(hits))
 	}
 	for _, o := range offers {
 		text := strings.Join(extract(t, filepath.Join(committed, "angebote", o.file())), "\n")
-		if got, want := strings.Contains(text, "Großgerät"), slices.Contains(hits, o.file()); got != want {
-			t.Errorf("%s: mentions Großgerät %v, want %v", o.file(), got, want)
+		if got, want := carRE.MatchString(text), slices.Contains(hits, o.file()); got != want {
+			t.Errorf("%s: offers a company car %v, want %v", o.file(), got, want)
 		}
 	}
 }
 
 // The scanned protocol has no text layer; with OCR its participants and
-// the canteen topic are readable.
+// the clubhouse topic are readable.
 func TestScanNeedsOCR(t *testing.T) {
 	if !ocr.Available() {
 		t.Skip("no OCR on this system")
@@ -146,8 +148,8 @@ func TestScanNeedsOCR(t *testing.T) {
 		}
 	}
 	text := strings.Join(extract(t, filepath.Join(committed, "protokolle", s.file())), "\n")
-	if !strings.Contains(text, "Mensa") {
-		t.Error("canteen topic not recognised")
+	if !strings.Contains(text, "Vereinsheim") {
+		t.Error("clubhouse topic not recognised")
 	}
 	for _, p := range s.present {
 		if n := personName(p); !strings.Contains(text, n) {
@@ -158,11 +160,12 @@ func TestScanNeedsOCR(t *testing.T) {
 
 func TestPersonName(t *testing.T) {
 	for in, want := range map[string]string{
-		"Herr Prof. Dr. Martin Albers (Vorsitz)": "Martin Albers",
-		"Frau Dr. Renate Kühn (Kanzlerin)":       "Renate Kühn",
-		"Herr Tim Köhler (i. V. Frau Schubert)":  "Tim Köhler",
-		"Frau Lea Schubert":                      "Lea Schubert",
-		"Frau Prof. Dr. Eva Kirchner (TOP 3)":    "Eva Kirchner",
+		"Herr Martin Albers (Vorsitz)":          "Martin Albers",
+		"Herr Dr. Thomas Engel":                 "Thomas Engel",
+		"Frau Renate Kühn (Kassenprüferin)":     "Renate Kühn",
+		"Herr Tim Köhler (i. V. Frau Schubert)": "Tim Köhler",
+		"Frau Lea Schubert":                     "Lea Schubert",
+		"Frau Prof. Dr. Eva Kirchner (TOP 3)":   "Eva Kirchner",
 	} {
 		if got := personName(in); got != want {
 			t.Errorf("personName(%q) = %q, want %q", in, got, want)

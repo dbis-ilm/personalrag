@@ -111,48 +111,48 @@ func buildCases(ss []session, offers []offer) Cases {
 		}
 	}
 	slices.Sort(guests)
-	hits, lookalike := equipmentFiles(offers)
+	hits, lookalike := carFiles(offers)
 	file := func(n int) string { return fmt.Sprintf("protokoll-%d.pdf", n) }
 
 	return Cases{Version: 1, Cases: []Case{
 		{
 			ID: "protokolle-teilnahme", Folder: "protokolle", Mode: "agent",
-			Question: "Erstelle mir aus allen Protokollen der Sammlung eine Liste der Teilnehmerinnen und Teilnehmer (nur die Anwesenden, keine Gäste und keine Entschuldigten) und zähle, an wie vielen Sitzungen jede Person teilgenommen hat.",
+			Question: "Erstelle mir aus allen Protokollen des Vereinsausschusses eine Liste der Teilnehmerinnen und Teilnehmer (nur die Anwesenden, keine Gäste und keine Entschuldigten) und zähle, an wie vielen Sitzungen jede Person teilgenommen hat.",
 			Expect:   Expect{Counts: cm, NotCounted: guests},
 			Note:     fmt.Sprintf("Participants stand in the left column, guests and the excused in the right one. Protocol %d is a scan (OCR). The deputy counts for himself, not for the member he stands in for.", scanSession),
 		},
 		{
-			ID: "protokolle-bibliotheksordnung", Folder: "protokolle", Mode: "answer",
-			Question: "In welcher Sitzung wurde die Neufassung der Bibliotheksordnung beschlossen?",
+			ID: "protokolle-beitragsordnung", Folder: "protokolle", Mode: "answer",
+			Question: "In welcher Sitzung wurde die neue Beitragsordnung beschlossen?",
 			Expect:   Expect{Documents: []string{file(48)}, Distractors: []string{file(45)}, Contains: []string{"48"}},
 			Note:     "Session 45 had only a first reading without a decision.",
 		},
 		{
 			ID: "protokolle-haushalt", Folder: "protokolle", Mode: "answer",
-			Question: "In welchen Sitzungen hat der Senat Beschlüsse zum Haushalt gefasst?",
+			Question: "In welchen Sitzungen hat der Vereinsausschuss Beschlüsse zum Haushalt gefasst?",
 			Expect:   Expect{Documents: []string{file(42), file(51)}, Distractors: []string{file(46)}, Contains: []string{"42", "51"}},
-			Note:     "Session 46 has a budget report without a decision.",
+			Note:     "Session 46 has a cash report without a decision.",
 		},
 		{
 			ID: "protokolle-gaeste", Folder: "protokolle", Mode: "answer",
-			Question: "Wer war in der 45. Sitzung des Senats als Gast anwesend?",
+			Question: "Wer war in der 45. Sitzung des Vereinsausschusses als Gast anwesend?",
 			Expect:   Expect{Documents: []string{file(45)}, Contains: guests45},
 		},
 		{
 			ID: "protokolle-scan", Folder: "protokolle", Mode: "search",
-			Question: "Neubau der Mensa",
+			Question: "Neubau des Vereinsheims",
 			Expect:   Expect{Documents: []string{file(scanSession)}},
-			Note:     "Only the scanned protocol mentions the canteen; it needs OCR.",
+			Note:     "Only the scanned protocol is about the new clubhouse; it needs OCR.",
 		},
 		{
-			ID: "angebote-grossgeraete", Folder: "angebote", Mode: "answer",
-			Question: "Zeige mir alle Berufungsangebote, in denen Großgeräte erwähnt werden.",
+			ID: "angebote-dienstwagen", Folder: "angebote", Mode: "answer",
+			Question: "Zeige mir alle Vertragsangebote, in denen ein Dienstwagen angeboten wird.",
 			Expect:   Expect{Documents: hits, Distractors: lookalike},
-			Note:     fmt.Sprintf("Nine offers; offer %d mentions it only on page 2. Distractors mention small equipment or open-plan labs. Use \"show more\" until all are found.", lateEquipment),
+			Note:     fmt.Sprintf("Nine offers, worded Dienstwagen, Firmenwagen or Dienstfahrzeug; offer %d mentions it only on page 2. Distractors offer bike leasing, tickets or parking. Use \"show more\" until all are found.", lateCar),
 		},
 		{
-			ID: "angebote-grossgeraete-suche", Folder: "angebote", Mode: "search",
-			Question: "Großgeräte",
+			ID: "angebote-dienstwagen-suche", Folder: "angebote", Mode: "search",
+			Question: "Dienstwagen",
 			Expect:   Expect{Documents: hits, Distractors: lookalike},
 		},
 	}}

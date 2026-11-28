@@ -7,73 +7,84 @@ import (
 	"strings"
 )
 
-// Use case 5: completeness. Forty offer letters for professorships; nine
-// mention large-scale equipment ("Großgerät") in varied wording, one of them
-// only on its second page. Others mention look-alikes (small equipment,
-// open-plan labs) that a question about Großgeräte must not return.
+// Use case 5: completeness. Forty job offers of an advertising agency;
+// nine offer a company car in varied wording (Dienstwagen, Firmenwagen,
+// Dienstfahrzeug), one of them only on its second page. Others mention
+// look-alikes (bike leasing, public transport ticket, parking) that a
+// question about company cars must not return.
+
+const agencyName = "Blaupause Kommunikation GmbH"
 
 type offer struct {
 	n         int
-	field     string
-	grade     string
+	position  string
 	candidate string
-	equipment string // sentence about Großgeräte, "" for none
+	car       string // sentence offering a company car, "" for none
 	lookalike string // distracting sentence, "" for none
-	late      bool   // the Großgeräte sentence is on page 2
+	late      bool   // the car sentence is on page 2
 }
 
-var offerFields = []string{
-	"Theoretische Physik", "Organische Chemie", "Datenbanksysteme", "Regelungstechnik", "Werkstoffwissenschaft",
-	"Analytische Chemie", "Festkörperphysik", "Softwaretechnik", "Mikrosystemtechnik", "Biomedizinische Technik",
-	"Volkswirtschaftslehre", "Marketing", "Medienpsychologie", "Angewandte Mathematik", "Statistik",
-	"Thermodynamik", "Strömungsmechanik", "Elektrische Energietechnik", "Nachrichtentechnik", "Robotik",
-	"Maschinelles Lernen", "IT-Sicherheit", "Rechnerarchitektur", "Optik", "Quantentechnologie",
-	"Umweltverfahrenstechnik", "Fahrzeugtechnik", "Produktionstechnik", "Bauinformatik", "Wirtschaftsinformatik",
-	"Unternehmensrechnung", "Medienwissenschaft", "Didaktik der Informatik", "Mathematische Optimierung", "Geoinformatik",
-	"Biophysik", "Halbleitertechnik", "Akustik", "Kommunikationsnetze", "Technische Mechanik",
+var positions = []string{
+	"Art Director", "Senior Texterin", "Junior Texter", "Social Media Manager", "Projektmanagerin",
+	"Kundenberater", "Grafikdesignerin", "Motion Designer", "UX-Designerin", "Frontend-Entwickler",
+	"Mediaplanerin", "Content-Strategin", "PR-Beraterin", "Eventmanager", "Fotograf",
+	"Creative Director", "Account Director", "Werbetexter", "SEO-Spezialistin", "Performance-Marketing-Manager",
+	"Datenanalystin", "Produktionsleiter", "Illustratorin", "Videoredakteur", "Community-Managerin",
+	"Office-Managerin", "Buchhalter", "Personalreferentin", "IT-Administrator", "Junior Art Director",
+	"Strategieberater", "Markenberaterin", "Redakteur", "Konzepterin", "Webentwicklerin",
+	"Kampagnenmanager", "Lektorin", "3D-Designer", "Sprecherin", "Teamassistenz",
 }
 
-var firstNames = []string{"Anna", "Bernhard", "Clara", "Daniel", "Elena", "Fabian", "Greta", "Hannes", "Isabel", "Jakob", "Karla", "Leon", "Marie", "Niklas", "Olga", "Philipp", "Rosa", "Sebastian", "Tanja", "Valentin"}
+// firstNames by salutation, so that "Frau" goes with a female name.
+var firstNames = map[string][]string{
+	"Frau": {"Anna", "Clara", "Elena", "Greta", "Isabel", "Karla", "Marie", "Olga", "Rosa", "Tanja"},
+	"Herr": {"Bernhard", "Daniel", "Fabian", "Hannes", "Jakob", "Leon", "Niklas", "Philipp", "Sebastian", "Valentin"},
+}
 var lastNames = []string{"Adler", "Berger", "Conrad", "Dorn", "Eckert", "Falk", "Graf", "Haas", "Imhof", "Jansen", "Keller", "Lang", "Maurer", "Nagel", "Otto", "Pfeiffer", "Quandt", "Roth", "Sauer", "Thiel"}
 
-// equipmentSentences mention Großgeräte; offers with these numbers get them.
-var equipmentSentences = map[int]string{
-	2:  "Darüber hinaus sagt die Hochschule Ihnen ein Großgerät (Rasterelektronenmikroskop) im Wert von bis zu 650.000 € zu, das als Großgeräteantrag nach Art. 91b GG gemeinsam mit Ihnen beantragt wird.",
-	7:  "Die Hochschule unterstützt Sie bei der Beantragung eines Großgeräts bei der Deutschen Forschungsgemeinschaft und übernimmt den Eigenanteil von 15 Prozent.",
-	11: "Sie werden an der Beschaffung des Großgeräts „Hochleistungsrechner“ beteiligt, das ab 2026 im Rechenzentrum betrieben wird.",
-	16: "Die Großgeräte der Fakultät, insbesondere der Kernspintomograph, stehen Ihnen zur Mitnutzung zur Verfügung.",
-	19: "Für die Großgeräteinvestition „Laserlabor“ stellt die Hochschule eine Kofinanzierung von 200.000 € bereit.",
-	24: "Für ein Massenspektrometer (Großgerät) werden einmalig 420.000 € aus Mitteln der Hochschule bereitgestellt.",
-	28: "Sie erhalten Zugang zu den Großgeräten des Zentrums für Mikroskopie und Nanoanalytik.",
-	33: "Die Hochschule wird für Ihre Forschung einen Großgeräteantrag im Programm Forschungsbauten stellen.",
-	37: "Ein Großgerät für die Halbleiterfertigung (Lithografieanlage) wird im Reinraum des Instituts aufgestellt und steht Ihrer Arbeitsgruppe zur Verfügung.",
+// carSentences offer a company car; offers with these numbers get them.
+var carSentences = map[int]string{
+	2:  "Sie erhalten einen Dienstwagen der Mittelklasse, den Sie auch privat nutzen dürfen; die private Nutzung wird nach der 1-Prozent-Regelung versteuert.",
+	7:  "Für Ihre Kundentermine stellen wir Ihnen einen Firmenwagen (Elektrofahrzeug) zur Verfügung; die Ladekosten übernimmt die Agentur.",
+	11: "Ab dem siebten Monat steht Ihnen ein Dienstwagen aus unserem Fuhrpark zu, alternativ eine monatliche Mobilitätspauschale von 450 €.",
+	16: "Zur Position gehört ein Dienstwagen der oberen Mittelklasse mit Tankkarte, auch zur privaten Nutzung.",
+	19: "Zusätzlich stellen wir Ihnen ein Dienstfahrzeug zur Verfügung, das Sie für Dienstreisen und den Weg zur Arbeit nutzen können.",
+	24: "Für Außentermine bei Kunden können Sie jederzeit einen Dienstwagen aus dem Agentur-Pool buchen.",
+	28: "Sie erhalten einen Firmenwagen nach Wahl bis zu einem Listenpreis von 45.000 €, Versicherung und Wartung trägt die Agentur.",
+	33: "Ein Dienstwagen mit Hybridantrieb steht Ihnen ab Arbeitsbeginn zur Verfügung; die Agentur übernimmt alle laufenden Kosten.",
+	37: "Für Ihre Einsätze bei Dreharbeiten stellen wir Ihnen einen Dienstwagen (Kleintransporter) für Technik und Ausrüstung bereit.",
 }
 
-// lateEquipment is the offer whose Großgeräte sentence is on page 2.
-const lateEquipment = 19
+// lateCar is the offer whose car sentence is on page 2.
+const lateCar = 19
 
 var lookalikes = []string{
-	"Für Geräte und Software in der Lehre stehen jährlich 8.000 € zur Verfügung.",
-	"Kleingeräte bis 10.000 € können aus den laufenden Sachmitteln beschafft werden.",
-	"Ihre Arbeitsgruppe erhält Flächen in einem Großraumlabor mit 120 m².",
-	"Die Werkstatt der Fakultät fertigt Versuchsaufbauten und Laborgeräte für Sie.",
-	"Ein großes Büro mit Besprechungsbereich wird Ihnen im Neubau zugewiesen.",
+	"Über unser Dienstrad-Leasing können Sie ein Fahrrad oder E-Bike zu günstigen Konditionen nutzen.",
+	"Die Agentur übernimmt die Kosten für das Deutschlandticket.",
+	"Ein Stellplatz in der Tiefgarage des Bürogebäudes steht Ihnen kostenfrei zur Verfügung.",
+	"Für die Fahrt zur Arbeit zahlen wir einen Fahrtkostenzuschuss von 50 € im Monat.",
+	"Bei Dienstreisen erstatten wir Bahnfahrten in der ersten Klasse.",
+}
+
+func candidate(rng *rand.Rand) string {
+	sal := []string{"Frau", "Herr"}[rng.IntN(2)]
+	names := firstNames[sal]
+	return fmt.Sprintf("%s %s %s", sal, names[rng.IntN(len(names))], lastNames[rng.IntN(len(lastNames))])
 }
 
 func buildOffers() []offer {
 	rng := rand.New(rand.NewPCG(5, 2025))
 	var out []offer
-	for i, f := range offerFields {
+	for i, p := range positions {
 		n := i + 1
 		o := offer{
 			n:         n,
-			field:     f,
-			grade:     []string{"W2", "W3"}[rng.IntN(2)],
-			candidate: fmt.Sprintf("%s %s %s", []string{"Frau Dr.", "Herr Dr."}[rng.IntN(2)], firstNames[rng.IntN(len(firstNames))], lastNames[rng.IntN(len(lastNames))]),
-			equipment: equipmentSentences[n],
-			late:      n == lateEquipment,
+			position:  p,
+			candidate: candidate(rng),
+			car:       carSentences[n],
+			late:      n == lateCar,
 		}
-		if o.equipment == "" && rng.Float64() < 0.5 {
+		if o.car == "" && rng.Float64() < 0.5 {
 			o.lookalike = lookalikes[rng.IntN(len(lookalikes))]
 		}
 		out = append(out, o)
@@ -82,69 +93,70 @@ func buildOffers() []offer {
 }
 
 func (o offer) file() string {
-	slug := strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss", " ", "-").Replace(strings.ToLower(o.field))
-	return fmt.Sprintf("berufungsangebot-%02d-%s.pdf", o.n, slug)
+	slug := strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss", " ", "-").Replace(strings.ToLower(o.position))
+	return fmt.Sprintf("angebot-%02d-%s.pdf", o.n, slug)
 }
 
 func (o offer) layout(rng *rand.Rand) *layout {
-	l := newLayout("Hochschule Musterstadt · Der Präsident")
-	l.at(marginL, 11, true, "Hochschule Musterstadt")
+	l := newLayout(agencyName + " · Personal")
+	l.at(marginL, 11, true, agencyName)
 	l.at(150, 10, false, fmt.Sprintf("Musterstadt, %02d.%02d.2025", 1+rng.IntN(28), 1+rng.IntN(12)))
 	l.gap(5)
-	l.line(marginL, 9, false, "Der Präsident", 14)
+	l.line(marginL, 9, false, "Personalabteilung", 14)
+	street := []string{"Gartenstraße", "Am Markt", "Lindenallee", "Bahnhofstraße", "Wiesenweg"}[rng.IntN(5)]
 	l.line(marginL, 10, false, o.candidate, 5)
-	l.line(marginL, 10, false, "Universität Beispielstadt", 5)
-	l.line(marginL, 10, false, "Institut für "+o.field, 14)
-	l.line(marginL, 12, true, fmt.Sprintf("Berufung auf die %s-Professur „%s“", o.grade, o.field), 10)
+	l.line(marginL, 10, false, fmt.Sprintf("%s %d", street, 1+rng.IntN(80)), 5)
+	l.line(marginL, 10, false, fmt.Sprintf("%05d Beispielstadt", 10000+rng.IntN(89999)), 14)
+	l.line(marginL, 12, true, "Ihr Vertragsangebot als "+o.position, 10)
 
-	salutation := "Sehr geehrte Frau Dr. "
+	salutation := "Sehr geehrte Frau "
 	if strings.HasPrefix(o.candidate, "Herr") {
-		salutation = "Sehr geehrter Herr Dr. "
+		salutation = "Sehr geehrter Herr "
 	}
 	last := o.candidate[strings.LastIndex(o.candidate, " ")+1:]
 	l.para(10, false, salutation+last+",")
-	l.para(10, false, fmt.Sprintf("ich freue mich, Ihnen den Ruf auf die %s-Professur „%s“ an der Hochschule Musterstadt zu erteilen. Mit diesem Schreiben unterbreite ich Ihnen das Angebot der Hochschule zur Ausstattung der Professur.", o.grade, o.field))
-	l.line(marginL, 10, true, "1. Personal", 6)
-	l.para(10, false, fmt.Sprintf("Der Professur werden %d Stellen für wissenschaftliche Mitarbeiterinnen und Mitarbeiter (E13, 100 Prozent) sowie eine halbe Stelle im Sekretariat zugeordnet.", 2+rng.IntN(3)))
-	l.line(marginL, 10, true, "2. Sachmittel", 6)
-	l.para(10, false, fmt.Sprintf("Für laufende Sachausgaben erhalten Sie jährlich %d.000 €. Hinzu kommt eine einmalige Erstausstattung von %d.000 € für Laborausstattung, Rechner und Literatur.", 10+rng.IntN(20), 50+rng.IntN(150)))
+	l.para(10, false, fmt.Sprintf("vielen Dank für die guten Gespräche. Wir freuen uns, Ihnen die Position %s in unserer Agentur anzubieten, und fassen die wesentlichen Bedingungen hier zusammen.", o.position))
+	l.line(marginL, 10, true, "1. Beginn und Arbeitszeit", 6)
+	l.para(10, false, fmt.Sprintf("Das Arbeitsverhältnis beginnt am 1. %s 2026 und ist unbefristet. Die wöchentliche Arbeitszeit beträgt %d Stunden; Sie können an bis zu drei Tagen pro Woche mobil arbeiten.", months[rng.IntN(12)], []int{32, 36, 40}[rng.IntN(3)]))
+	l.line(marginL, 10, true, "2. Vergütung", 6)
+	l.para(10, false, fmt.Sprintf("Ihr Bruttojahresgehalt beträgt %d.000 €, zahlbar in zwölf Monatsraten. Hinzu kommt eine erfolgsabhängige Prämie von bis zu %d Prozent.", 42+rng.IntN(40), 5+rng.IntN(11)))
+	l.line(marginL, 10, true, "3. Urlaub und Zusatzleistungen", 6)
+	l.para(10, false, fmt.Sprintf("Sie erhalten %d Tage Urlaub im Jahr sowie einen Zuschuss zur betrieblichen Altersvorsorge.", 28+rng.IntN(3)))
 	if o.lookalike != "" {
 		l.para(10, false, o.lookalike)
 	}
-	if o.equipment != "" && !o.late {
-		l.para(10, false, o.equipment)
+	if o.car != "" && !o.late {
+		l.para(10, false, o.car)
 	}
-	l.line(marginL, 10, true, "3. Räume", 6)
-	l.para(10, false, fmt.Sprintf("Ihnen werden Büro- und Laborflächen von insgesamt %d m² im Gebäude %s zugewiesen.", 60+rng.IntN(200), []string{"A", "B", "C", "Nord"}[rng.IntN(4)]))
 	if o.late {
 		l.pages++
 		l.y = marginTop
-		l.line(marginL, 10, true, "4. Investitionen", 6)
-		l.para(10, false, o.equipment)
+		l.line(marginL, 10, true, "4. Mobilität", 6)
+		l.para(10, false, o.car)
 	}
-	l.line(marginL, 10, true, "Weiteres Verfahren", 6)
-	l.para(10, false, "Ich bitte Sie, mir innerhalb von acht Wochen mitzuteilen, ob Sie das Angebot annehmen. Für Rückfragen steht Ihnen das Berufungsmanagement gern zur Verfügung.")
+	l.line(marginL, 10, true, "Weiteres Vorgehen", 6)
+	l.para(10, false, "Wir bitten Sie, uns innerhalb von zwei Wochen mitzuteilen, ob Sie das Angebot annehmen. Den Arbeitsvertrag senden wir Ihnen dann zur Unterschrift zu.")
 	l.para(10, false, "Mit freundlichen Grüßen")
-	l.line(marginL, 10, false, "Prof. Dr. Martin Albers", 5)
+	l.line(marginL, 10, false, "Johanna Wolff, Geschäftsführerin", 5)
 	return l
 }
 
 func writeOffers(dir string, os []offer) error {
 	rng := rand.New(rand.NewPCG(7, 2025))
 	for _, o := range os {
-		if err := o.layout(rng).writePDF(filepath.Join(dir, o.file()), "Berufungsangebot "+o.field); err != nil {
+		if err := o.layout(rng).writePDF(filepath.Join(dir, o.file()), "Vertragsangebot "+o.position); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// equipmentFiles are the offers mentioning Großgeräte; lookalikeFiles the
-// ones with a distracting sentence.
-func equipmentFiles(os []offer) (hits, lookalike []string) {
+// carFiles are the offers with a company car; lookalikeFiles the ones
+// with a distracting sentence.
+func carFiles(os []offer) (hits, lookalike []string) {
 	for _, o := range os {
 		switch {
-		case o.equipment != "":
+		case o.car != "":
 			hits = append(hits, o.file())
 		case o.lookalike != "":
 			lookalike = append(lookalike, o.file())
