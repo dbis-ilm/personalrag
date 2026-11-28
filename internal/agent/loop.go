@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -12,9 +11,7 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	starjson "go.starlark.net/lib/json"
 	"go.starlark.net/starlark"
-	"go.starlark.net/syntax"
 
 	"github.com/dbis-ilm/personalrag/internal/rag"
 	"github.com/dbis-ilm/personalrag/internal/store"
@@ -46,6 +43,11 @@ type runKey struct{}
 type notebook struct {
 	mu      sync.Mutex
 	entries []*starlark.Dict
+
+	// state is the dict `state` of calc scripts: what one call keeps for
+	// the next. calcMu lets one script at a time use it.
+	calcMu sync.Mutex
+	state  *starlark.Dict
 }
 
 // add records a tool result as {tool, input, document, text}.
@@ -133,7 +135,9 @@ func (s *Server) Tools(g *genkit.Genkit) []ai.ToolRef {
 	if !s.noText {
 		tools = append(tools, defineTool(g, s, "read_document", "Returns the text of one document, paged by characters, with [Page n] markers; optionally only some pages.", s.readDocument))
 	}
-	return append(tools, genkit.DefineTool(g, "calc", "Runs Starlark (a Python dialect: lists, dicts, loops, functions, sorted, len, str methods; json.decode/encode) to count, sum, sort or build tables exactly. The results of all earlier tool calls are in the list `outputs`, in call order; each is a dict with keys tool, input, document and text (for extract: the extracted lines; for read_document: the text). Work on outputs instead of retyping data. print() output and the variable `result` are returned. No files, no network.", calcTool))
+	calcDesc := `Runs Starlark (a Python dialect: lists, dicts, loops, functions, sorted, len, str methods; json.decode/encode) to count, sum, sort or build tables exactly. The results of all earlier tool calls are in the list ` + "`outputs`" + `, in call order; each is a dict with keys tool, input, document and text (for extract: the extracted lines; for read_document: the text). Work on outputs instead of retyping data.
+For a task over many documents, call the document tools from the script instead of one tool call per document: ` + "`" + strings.Join(s.scriptToolNames(), "`, `") + "`" + ` take the same keyword arguments as the tools and return what they return as a dict, e.g. ` + "`for d in list_documents(collection_id=\"c1\")[\"documents\"]: r = extract(document_id=d[\"id\"], instruction=\"...\")`" + `; a failing call returns {"error": "..."} and the script goes on, so check for "error". The calls run one after another; each appears as a step. Also available: 'math', 'time' (parse_time, duration; no clock), 'normalize_name(line)' (strips bullets, numbers and spaces from a list line), 'count_by(items, key=None)' (dict item to count, highest first) and 'table(rows, columns=None, format="markdown"|"csv")'. The dict 'state' keeps values from one calc call to the next (a value the script also held in a variable is read-only in later calls: assign a new one to change it). print() output and the variable ` + "`result`" + ` are returned. No files, no network.`
+	return append(tools, genkit.DefineTool(g, "calc", calcDesc, s.calc))
 }
 
 // ToolResult wraps a tool's output for the agent. A failing call (e.g. a
@@ -144,28 +148,36 @@ type ToolResult[Out any] struct {
 	Error  string `json:"error,omitempty"`
 }
 
+// callTool runs one tool call of the agent with what every call gets: an
+// access log entry, a step event for the UI and an entry in the run's
+// notebook. The model calls it as a tool, a calc script as a builtin.
+func callTool[In, Out any](ctx context.Context, s *Server, name string, fn toolFunc[In, Out], in In) (Out, error) {
+	started := time.Now()
+	out, oc, err := fn(ctx, in)
+	step := Step{Tool: name, Input: summarizeInput(in), Summary: oc.summary, Took: time.Since(started)}
+	e := store.AccessEntry{Client: AgentClient, Tool: name, Request: step.Input, Result: oc.summary, Kind: "ok", Duration: step.Took}
+	switch {
+	case err != nil:
+		step.Error, e.Kind, e.Result = err.Error(), "error", err.Error()
+	case oc.warn:
+		e.Kind = "warn"
+	}
+	if lerr := s.st.LogAccess(context.WithoutCancel(ctx), e); lerr != nil {
+		slog.Warn("agent: access log failed", "err", lerr)
+	}
+	if report, ok := ctx.Value(stepKey{}).(func(Step)); ok {
+		report(step)
+	}
+	if nb, ok := ctx.Value(runKey{}).(*notebook); ok && err == nil {
+		doc, text := resultText(out)
+		nb.add(name, step.Input, doc, text)
+	}
+	return out, err
+}
+
 func defineTool[In, Out any](g *genkit.Genkit, s *Server, name, desc string, fn toolFunc[In, Out]) ai.ToolRef {
 	return genkit.DefineTool(g, name, desc, func(tc *ai.ToolContext, in In) (ToolResult[Out], error) {
-		started := time.Now()
-		out, oc, err := fn(tc.Context, in)
-		step := Step{Tool: name, Input: summarizeInput(in), Summary: oc.summary, Took: time.Since(started)}
-		e := store.AccessEntry{Client: AgentClient, Tool: name, Request: step.Input, Result: oc.summary, Kind: "ok", Duration: step.Took}
-		switch {
-		case err != nil:
-			step.Error, e.Kind, e.Result = err.Error(), "error", err.Error()
-		case oc.warn:
-			e.Kind = "warn"
-		}
-		if lerr := s.st.LogAccess(context.WithoutCancel(tc.Context), e); lerr != nil {
-			slog.Warn("agent: access log failed", "err", lerr)
-		}
-		if fn, ok := tc.Context.Value(stepKey{}).(func(Step)); ok {
-			fn(step)
-		}
-		if nb, ok := tc.Context.Value(runKey{}).(*notebook); ok && err == nil {
-			doc, text := resultText(out)
-			nb.add(name, step.Input, doc, text)
-		}
+		out, err := callTool(tc.Context, s, name, fn, in)
 		if err != nil {
 			if tc.Context.Err() != nil {
 				return ToolResult[Out]{}, err // cancelled: stop the run
@@ -176,63 +188,6 @@ func defineTool[In, Out any](g *genkit.Genkit, s *Server, name, desc string, fn 
 	})
 }
 
-// ---- calc ----
-
-type CalcIn struct {
-	Code string `json:"code" jsonschema:"Starlark code; assign the answer to 'result' or print() it"`
-}
-
-type CalcOut struct {
-	Output string `json:"output,omitempty"`
-	Result string `json:"result,omitempty"`
-	Error  string `json:"error,omitempty"`
-}
-
-// calcTool runs Starlark with a step limit and no access to files, network
-// or the clock. Errors are returned as output, so the model can fix its
-// code instead of the loop failing.
-func calcTool(tc *ai.ToolContext, in CalcIn) (CalcOut, error) {
-	var out strings.Builder
-	thread := &starlark.Thread{
-		Name:  "calc",
-		Print: func(_ *starlark.Thread, msg string) { out.WriteString(msg + "\n") },
-	}
-	thread.SetMaxExecutionSteps(10_000_000)
-	finished := make(chan struct{})
-	defer close(finished)
-	go func() {
-		select {
-		case <-tc.Context.Done():
-			thread.Cancel("cancelled")
-		case <-finished:
-		}
-	}()
-	outputs := starlark.NewList(nil)
-	if nb, ok := tc.Context.Value(runKey{}).(*notebook); ok {
-		outputs = nb.list()
-	}
-	predeclared := starlark.StringDict{"json": starjson.Module, "outputs": outputs}
-	opts := &syntax.FileOptions{Set: true, While: true, TopLevelControl: true, GlobalReassign: true, Recursion: true}
-	globals, err := starlark.ExecFileOptions(opts, thread, "calc.star", in.Code, predeclared)
-	res := CalcOut{Output: strings.TrimSpace(out.String())}
-	if err != nil {
-		var ee *starlark.EvalError
-		if errors.As(err, &ee) {
-			res.Error = ee.Backtrace()
-		} else {
-			res.Error = err.Error()
-		}
-		return res, nil
-	}
-	if v, ok := globals["result"]; ok {
-		res.Result = v.String()
-	}
-	if len(res.Result) > 20000 {
-		res.Result = res.Result[:20000] + " …"
-	}
-	return res, nil
-}
-
 // ---- run ----
 
 // agentSystem guides the model; it extends the MCP instructions.
@@ -241,7 +196,8 @@ You are the assistant inside PersonalRAG and work only with the tools above. Pla
 - For "all", "every", lists, counts and tables: cover every relevant document (list_documents, then extract or read_document per document). Do not stop after a few.
 - When the same extraction runs over many documents, try it on one or two first and look at which parts the results come from. If the information sits in one place in every document, limit the remaining calls with pages or stop_after_match.
 - Before counting, clean each document's result: one item per line, drop headings and empty results, and count an item at most once per document unless the task asks for occurrences.
-- Count, sum and sort with the calc tool, never in your head: after collecting the data (e.g. extract per document), call calc once with code that loops over "outputs" (e.g. for o in outputs: if o["tool"] == "extract": for line in o["text"].splitlines(): ...). Normalise names (strip "- ", bullets and spaces) before counting. Report the counts calc returns.
+- For many documents, write one calc script that loops over list_documents(...)["documents"] and calls extract(document_id=..., instruction=...) (or read_document) itself, cleans and counts the results and returns the table: one tool call instead of one per document. The functions take the tools' keyword arguments; a failing call returns {"error": ...}, so check for it, and report documents that failed.
+- Count, sum and sort with the calc tool, never in your head: after collecting the data (e.g. extract per document, or in the same script), call calc with code that loops over "outputs" (e.g. for o in outputs: if o["tool"] == "extract": for line in o["text"].splitlines(): ...). Normalise names with normalize_name() before counting, and count with count_by(). Report the counts calc returns.
 - Name the documents (and pages, where known) your answer rests on.
 - If something could not be read or found, say so.
 - Answer in the language of the task. Today is %s.`
