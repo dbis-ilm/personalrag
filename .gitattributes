@@ -6,3 +6,6 @@ Dockerfile text eol=lf
 # Prompts are embedded into the binary; keep them byte-identical on every
 # platform (Windows checkouts would otherwise embed CRLF).
 *.prompt   text eol=lf
+
+# The demo corpus is generated and compared byte for byte (cmd/demogen).
+demo/**    -text
