@@ -199,6 +199,15 @@ var indexSteps = []migrate.Step{
 		}
 		return nil
 	}},
+	// The PDF reader now keeps columns apart (askyourdocs#29, #30): lists set side
+	// by side used to come out glued line by line. Indexed PDFs are queued
+	// again so their chunks get the new text; cached extract results for
+	// them were computed on the old text. A later change to text extraction
+	// adds a step like this one.
+	{Version: 4, Name: "re-index PDFs: columns kept apart", Up: migrate.Exec(
+		`DELETE FROM extract_cache WHERE document_id IN (SELECT id FROM documents WHERE format = 'PDF')`,
+		`UPDATE documents SET status = 'pending' WHERE format = 'PDF' AND status = 'ok'`,
+	)},
 }
 
 func (s *Store) migrate(path string) error {

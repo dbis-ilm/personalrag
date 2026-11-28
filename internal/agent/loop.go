@@ -111,7 +111,7 @@ func (s *Server) Tools(g *genkit.Genkit) []ai.ToolRef {
 		defineTool(g, s, "list_documents", "Lists documents (id, name, format, pages, status), filterable by collection, folder, format and modification date, paged. Use it to cover every document of a collection.", s.listDocuments),
 		defineTool(g, s, "read_document", "Returns the text of one document, paged by characters, with [Page n] markers; optionally only some pages.", s.readDocument),
 		defineTool(g, s, "search_documents", "Hybrid search over the documents; returns the most relevant passages with document id, name and pages. Use it to find where something is, not to cover everything.", s.searchDocuments),
-		defineTool(g, s, "extract", "Runs an instruction over one document with the local model and returns only the result per part, e.g. 'list the names under Anwesend, one per line'. Prefer it over reading long documents.", s.extract),
+		defineTool(g, s, "extract", "Runs an instruction over one document with the local model and returns only the result per part, e.g. 'list the names under Anwesend, one per line'. Prefer it over reading long documents. pages limits it to part of the document, stop_after_match ends it at the first part with a result. Without them it reads the whole document: slow, and text elsewhere that merely resembles what is asked can produce false results.", s.extract),
 		genkit.DefineTool(g, "calc", "Runs Starlark (a Python dialect: lists, dicts, loops, functions, sorted, len, str methods; json.decode/encode) to count, sum, sort or build tables exactly. The results of all earlier tool calls are in the list `outputs`, in call order; each is a dict with keys tool, input, document and text (for extract: the extracted lines; for read_document: the text). Work on outputs instead of retyping data. print() output and the variable `result` are returned. No files, no network.", calcTool),
 	}
 }
@@ -219,6 +219,8 @@ func calcTool(tc *ai.ToolContext, in CalcIn) (CalcOut, error) {
 const agentSystem = instructions + `
 You are the assistant inside PersonalRAG and work only with the tools above. Plan the steps the task needs, then carry them out.
 - For "all", "every", lists, counts and tables: cover every relevant document (list_documents, then extract or read_document per document). Do not stop after a few.
+- When the same extraction runs over many documents, try it on one or two first and look at which parts the results come from. If the information sits in one place in every document, limit the remaining calls with pages or stop_after_match.
+- Before counting, clean each document's result: one item per line, drop headings and empty results, and count an item at most once per document unless the task asks for occurrences.
 - Count, sum and sort with the calc tool, never in your head: after collecting the data (e.g. extract per document), call calc once with code that loops over "outputs" (e.g. for o in outputs: if o["tool"] == "extract": for line in o["text"].splitlines(): ...). Normalise names (strip "- ", bullets and spaces) before counting. Report the counts calc returns.
 - Name the documents (and pages, where known) your answer rests on.
 - If something could not be read or found, say so.
