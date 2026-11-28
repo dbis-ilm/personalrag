@@ -1,6 +1,6 @@
 import { Fragment, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
-import { AgentStep, AppService, Source, Turn } from '../../bindings/github.com/dbis-ilm/personalrag'
+import { AgentStep, AppService, DemoQuestion, Source, Turn } from '../../bindings/github.com/dbis-ilm/personalrag'
 import AgentSteps from '../components/AgentSteps'
 import Icon from '../components/Icon'
 import ShareMenu from '../components/ShareMenu'
@@ -17,6 +17,8 @@ type TurnView = Omit<Turn, 'sources'> & { sources: Source[]; searching?: boolean
 const isMac = document.documentElement.classList.contains('platform-mac')
 const mod = () => (isMac ? '⌘' : t('common.ctrl'))
 const narrow = () => window.matchMedia('(max-width: 1180px)').matches
+
+const DEMO_MODE = { search: 'demo.mode.search', answer: 'demo.mode.answer', agent: 'demo.mode.agent' } as const
 
 export default function AskView({
   conversationId, onConversation, onChanged, scopeId, scopeName, searchOnly, agentModel, agentRemote, agentTextLocal, answerLocal, hasCollections, onAddFolder, onClearScope,
@@ -48,6 +50,7 @@ export default function AskView({
   const ownId = useRef('') // conversation this view just created; don't reload it
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [demoQuestions, setDemoQuestions] = useState<DemoQuestion[]>([])
 
   const setPreviewOpen = (open: boolean) => {
     setPreviewOpenState(open)
@@ -59,6 +62,26 @@ export default function AskView({
   }
 
   useEffect(() => { if (searchOnly) setMode('search') }, [searchOnly])
+
+  // Example questions of the demo collections in scope.
+  useEffect(() => {
+    if (!hasCollections) { setDemoQuestions([]); return }
+    AppService.DemoQuestions(scopeId).then((q) => setDemoQuestions(q ?? [])).catch(() => setDemoQuestions([]))
+  }, [scopeId, hasCollections])
+
+  // pickDemoQuestion puts an example into the input with its mode; Enter sends.
+  const pickDemoQuestion = (q: DemoQuestion) => {
+    const m = q.mode === 'agent' && agentModel ? 'agent' : q.mode === 'search' || searchOnly ? 'search' : 'answer'
+    setMode(m)
+    setDraft(q.question)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
+  const addDemo = () => {
+    AppService.AddDemo()
+      .then((n) => toast(n > 0 ? t('demo.added', { count: n }) : t('demo.present')))
+      .catch((e) => toast(errorText(e), 'error'))
+  }
   useEffect(() => { if (!agentModel) setMode((m) => (m === 'agent' ? (searchOnly ? 'search' : 'answer') : m)) }, [agentModel, searchOnly])
 
   useEffect(() => {
@@ -311,14 +334,31 @@ export default function AskView({
                   <>
                     <h1 className="question">{t('ask.emptyTitle')}</h1>
                     <p className="lead">{t('ask.emptyLead')} {searchOnly ? t('ask.emptySearchOnly') : t('ask.emptyToggle', { key: MOD })}</p>
+                    {demoQuestions.length > 0 && (
+                      <section aria-label={t('demo.examples')} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, width: '100%' }}>
+                        <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>{t('demo.examples')}</span>
+                        {demoQuestions.map((q) => (
+                          <button key={q.collectionId + q.question} type="button" className="btn demo-question" onClick={() => pickDemoQuestion(q)}
+                            disabled={(q.mode === 'agent' && !agentModel) || (q.mode === 'answer' && searchOnly)}
+                            title={q.mode === 'agent' && !agentModel ? t('ask.noAgentModel') : undefined}>
+                            <span className="tag">{t(DEMO_MODE[q.mode as keyof typeof DEMO_MODE] ?? 'demo.mode.answer')}</span>
+                            <span style={{ flex: 1, textAlign: 'left' }}>{q.question}</span>
+                          </button>
+                        ))}
+                      </section>
+                    )}
                   </>
                 ) : (
                   <>
                     <h1 className="question">{t('ask.noDocsTitle')}</h1>
                     <p className="lead">{t('ask.noDocsLead')}</p>
-                    <button type="button" className="btn btn-primary" style={{ minHeight: 38 }} onClick={onAddFolder}>
-                      <Icon name="plus" size={14} strokeWidth={2.2} />{t('common.addFolder')}
-                    </button>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <button type="button" className="btn btn-primary" style={{ minHeight: 38 }} onClick={onAddFolder}>
+                        <Icon name="plus" size={14} strokeWidth={2.2} />{t('common.addFolder')}
+                      </button>
+                      <button type="button" className="btn" style={{ minHeight: 38 }} onClick={addDemo}>{t('demo.try')}</button>
+                    </div>
+                    <p className="muted" style={{ fontSize: 12 }}>{t('demo.hint')}</p>
                   </>
                 )}
               </div>

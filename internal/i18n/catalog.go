@@ -26,6 +26,10 @@ var catalog = map[string]entry{
 
 	// Folders and documents
 	"folder.notADir":        {"%s ist kein Ordner", "%s is not a folder"},
+	"demo.protokolle":       {"Demo: Vereinsprotokolle", "Demo: club minutes"},
+	"demo.angebote":         {"Demo: Vertragsangebote", "Demo: job offers"},
+	"demo.skript":           {"Demo: Vorlesungsskript", "Demo: lecture notes"},
+	"demo.pruefung":         {"Demo: Abschlussarbeit prüfen", "Demo: thesis check"},
 	"folder.inCollection":   {"Der Ordner gehört bereits zur Sammlung „%s“", "The folder already belongs to the collection “%s”"},
 	"folder.contains":       {"Der Ordner enthält %s aus der Sammlung „%s“. Entferne diese Sammlung zuerst oder wähle einen anderen Ordner", "The folder contains %s from the collection “%s”. Remove that collection first or choose another folder"},
 	"doc.notIndexed":        {"Das Dokument ist nicht im Index", "The document is not in the index"},

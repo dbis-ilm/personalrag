@@ -343,3 +343,5 @@ mark.term { background: transparent; color: var(--accent-text); font-weight: 650
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 .answer-table table { min-width: 0; }
 .agent-remote { margin: 0 auto 8px; max-width: 760px; width: calc(100% - 32px); }
+
+.demo-question { justify-content: flex-start; gap: 10px; min-height: 36px; text-align: left; white-space: normal; line-height: 1.35; padding: 6px 10px; }
