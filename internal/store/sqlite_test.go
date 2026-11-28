@@ -142,3 +142,48 @@ func TestFTSQuery(t *testing.T) {
 		t.Fatalf("FTSQuery = %s, want %s", got, want)
 	}
 }
+
+// Migration 4 queues indexed PDFs again (new column-aware text) and drops
+// their cached extract results; other documents are left alone.
+func TestReindexPDFsMigration(t *testing.T) {
+	ctx := context.Background()
+	st, path := openTest(t)
+	if err := st.CreateCollection(ctx, Collection{ID: "c", Name: "C", Color: "#000", Folders: []string{t.TempDir()}}); err != nil {
+		t.Fatal(err)
+	}
+	pdf, _ := st.UpsertDocument(ctx, Document{Path: "/x/a.pdf", CollectionID: "c", Format: "PDF", Status: StatusPending})
+	md, _ := st.UpsertDocument(ctx, Document{Path: "/x/b.md", CollectionID: "c", Format: "Markdown", Status: StatusPending})
+	scan, _ := st.UpsertDocument(ctx, Document{Path: "/x/s.pdf", CollectionID: "c", Format: "PDF", Status: StatusPending})
+	st.SetDocumentState(ctx, pdf, StatusOK, "", "h1")
+	st.SetDocumentState(ctx, md, StatusOK, "", "h2")
+	st.SetDocumentState(ctx, scan, StatusOCR, "@ocr", "")
+	st.PutExtract(ctx, "k-pdf", pdf, "Anna")
+	st.PutExtract(ctx, "k-md", md, "Bert")
+	// Pretend the database was written before migration 4.
+	if _, err := st.DB().ExecContext(ctx, `UPDATE schema_versions SET version = 3 WHERE component = 'index'`); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	st, err := Open(path, testutil.FakeEmbedder{}, "fake", testutil.FakeDim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	status := func(id int64) string {
+		d, err := st.DocumentByID(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d.Status
+	}
+	if status(pdf) != StatusPending || status(md) != StatusOK || status(scan) != StatusOCR {
+		t.Fatalf("statuses after migration: pdf %s, md %s, scan %s", status(pdf), status(md), status(scan))
+	}
+	if _, ok, _ := st.CachedExtract(ctx, "k-pdf"); ok {
+		t.Error("extract cache of the PDF kept")
+	}
+	if _, ok, _ := st.CachedExtract(ctx, "k-md"); !ok {
+		t.Error("extract cache of other documents dropped")
+	}
+}
